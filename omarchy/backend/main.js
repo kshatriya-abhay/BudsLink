@@ -7,7 +7,8 @@
 //   run [--detect-only] [--verbose]
 //
 // --detect-only  identify device families but never connect to a device
-// --verbose      enable upstream's runtime log ($STATE/log/runtime.log)
+// --verbose      enable upstream's runtime log ($STATE/log/runtime.log);
+//                so does an empty file at $STATE/verbose
 import Gio from 'gi://Gio';
 import GioUnix from 'gi://GioUnix';
 import GLib from 'gi://GLib';
@@ -31,11 +32,12 @@ Gio._promisify(Gio.DataInputStream.prototype, 'read_line_async');
 const PROTO = 1;
 const args = new Set(ARGV);
 const detectOnly = args.has('--detect-only');
-const verbose = args.has('--verbose');
 
 const repoRoot = GLib.path_get_dirname(GLib.path_get_dirname(
     GLib.path_get_dirname(Gio.File.new_for_uri(import.meta.url).get_path())));
 const stateDir = GLib.get_user_state_dir();
+const verbose = args.has('--verbose') ||
+    GLib.file_test(GLib.build_filenamev([stateDir, 'verbose']), GLib.FileTest.EXISTS);
 
 const stdout = new GioUnix.OutputStream({fd: 1, close_fd: false});
 function emit(obj) {
