@@ -177,25 +177,34 @@ function modelName(m) {
 // Some families keep defined rows hidden until the buds report a mode
 // (state.toggleNVisible, optionsBoxVisible). With no buds, reveal what the
 // config defines so its layout can be checked. Demo only.
+//
+// The reveal has to survive the device's own updates: device classes keep
+// their own copy of the state and push it whole (e.g. after a click), which
+// would hide the rows again. So the handler's setProps is wrapped to keep
+// revealed rows visible whenever the device reports them hidden.
 function revealDefined(handler) {
     const config = handler.getConfig();
-    const state = handler.getProps();
-    const patch = {};
-    for (const n of [1, 2]) {
-        const buttons = [1, 2, 3, 4].filter(b => config[`toggle${n}Button${b}Name`]);
-        if (buttons.length >= 2 && !state[`toggle${n}Visible`]) {
-            patch[`toggle${n}Visible`] = true;
-            if (!state[`toggle${n}State`])
-                patch[`toggle${n}State`] = 1;
+    const rows = [1, 2].filter(n =>
+        [1, 2, 3, 4].filter(b => config[`toggle${n}Button${b}Name`]).length >= 2);
+    const box = [1, 2, 3, 4].find(n => (config[`optionsBox${n}`] ?? []).length > 0);
+
+    const reveal = props => {
+        const out = {...props};
+        for (const n of rows) {
+            if (!out[`toggle${n}Visible`]) {
+                out[`toggle${n}Visible`] = true;
+                if (!out[`toggle${n}State`])
+                    out[`toggle${n}State`] = 1;
+            }
         }
-    }
-    if (!state.optionsBoxVisible) {
-        const box = [1, 2, 3, 4].find(n => (config[`optionsBox${n}`] ?? []).length > 0);
-        if (box)
-            patch.optionsBoxVisible = box;
-    }
-    if (Object.keys(patch).length > 0)
-        handler.setProps({...state, ...patch});
+        if (!out.optionsBoxVisible && box)
+            out.optionsBoxVisible = box;
+        return out;
+    };
+
+    const setProps = handler.setProps.bind(handler);
+    handler.setProps = props => setProps(reveal(props));
+    handler.setProps(handler.getProps());
 }
 
 // ---- host ----------------------------------------------------------------------
