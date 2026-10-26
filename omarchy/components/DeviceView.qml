@@ -35,6 +35,71 @@ Column {
     if (service && device) service.uiAction(device.path, action, value)
   }
 
+  // ---- keyboard navigation ----
+  // Focusable rows top to bottom. `key` identifies the row's widget (the
+  // ui-action it sends, or "controls"); the parent panel moves `cursor`
+  // with up/down and calls moveSideways() / activate().
+  readonly property var focusRows: {
+    var rows = []
+    if (!device) return rows
+    rows.push({ key: "controls", type: "switch" })
+    if (!ready || !controls) return rows
+    for (var i = 0; i < toggleRows.length; i++)
+      rows.push({ key: "toggle" + toggleRows[i].n + "State", type: "choice", options: toggleRows[i].options, value: toggleRows[i].value })
+    if (box) {
+      for (var k = 0; k < box.order.length; k++) {
+        var kind = box.order[k]
+        if (kind === "radio-button" && box.radio)
+          rows.push({ key: "box" + box.n + "RadioButtonState", type: "choice", options: box.radio.options, value: box.radio.value })
+        else if (kind === "check-button")
+          for (var c = 0; c < box.checks.length; c++)
+            rows.push({ key: "box" + box.n + "CheckButton" + box.checks[c].index + "State", type: "switch", checked: box.checks[c].checked })
+        else if (kind === "slider" && box.slider)
+          rows.push({ key: "box" + box.n + "SliderValue", type: "slider", value: box.slider.value })
+      }
+    }
+    return rows
+  }
+  property int cursor: -1        // index into focusRows, -1 = no cursor here
+  property int chip: 0           // highlighted chip in a "choice" row
+  readonly property var cursorRow: cursor >= 0 && cursor < focusRows.length ? focusRows[cursor] : null
+  readonly property string cursorKey: cursorRow ? cursorRow.key : ""
+
+  // Put the cursor on row i; on a chip row, start at the selected chip.
+  function focusRow(i) {
+    cursor = i
+    var row = cursorRow
+    if (row && row.type === "choice") {
+      chip = 0
+      for (var k = 0; k < row.options.length; k++)
+        if (row.options[k].value === row.value) chip = k
+    }
+  }
+
+  // Left/right: walk chips, or nudge a slider (sent when it changes).
+  function moveSideways(dx) {
+    var row = cursorRow
+    if (!row) return
+    if (row.type === "choice")
+      chip = Math.max(0, Math.min(row.options.length - 1, chip + dx))
+    else if (row.type === "slider")
+      uiAction(row.key, Math.max(0, Math.min(100, Math.round(row.value) + dx * 5)))
+  }
+
+  // Enter/space: pick the highlighted chip, or flip a switch.
+  function activate() {
+    var row = cursorRow
+    if (!row) return
+    if (row.key === "controls") {
+      if (service && device) service.setControls(device.path, !controls)
+    } else if (row.type === "choice") {
+      var option = row.options[chip]
+      if (option && option.value !== row.value) uiAction(row.key, Number(option.value))
+    } else if (row.type === "switch") {
+      uiAction(row.key, row.checked ? 0 : 1)
+    }
+  }
+
   spacing: Style.space(12)
 
   // ---------- Title ----------
@@ -96,6 +161,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       checked: view.controls
+      hasCursor: view.cursorKey === "controls"
       foreground: view.foreground
       onToggled: if (view.service && view.device) view.service.setControls(view.device.path, !view.controls)
     }
@@ -201,6 +267,7 @@ Column {
         width: parent.width
         options: modelData.options
         value: modelData.value
+        cursorIndex: view.cursorKey === "toggle" + modelData.n + "State" ? view.chip : -1
         foreground: view.foreground
         fontFamily: view.fontFamily
         onChanged: function(value) { view.uiAction("toggle" + modelData.n + "State", Number(value)) }
@@ -239,6 +306,7 @@ Column {
           visible: boxPart.modelData === "radio-button"
           options: view.box && view.box.radio ? view.box.radio.options : []
           value: view.box && view.box.radio ? view.box.radio.value : ""
+          cursorIndex: view.box && view.cursorKey === "box" + view.box.n + "RadioButtonState" ? view.chip : -1
           foreground: view.foreground
           fontFamily: view.fontFamily
           onChanged: function(value) { view.uiAction("box" + view.box.n + "RadioButtonState", Number(value)) }
@@ -268,6 +336,7 @@ Column {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               checked: modelData.checked
+              hasCursor: view.cursorKey === "box" + view.box.n + "CheckButton" + modelData.index + "State"
               foreground: view.foreground
               onToggled: view.uiAction("box" + view.box.n + "CheckButton" + modelData.index + "State", modelData.checked ? 0 : 1)
             }
@@ -282,6 +351,7 @@ Column {
           fontFamily: view.fontFamily
         }
         PanelSlider {
+          id: boxSlider
           width: parent.width
           visible: boxPart.modelData === "slider"
           bar: view.bar
@@ -291,6 +361,17 @@ Column {
           integer: true
           value: view.box && view.box.slider ? view.box.slider.value : 0
           onReleased: function(value) { view.uiAction("box" + view.box.n + "SliderValue", Math.round(value)) }
+
+          // PanelSlider has no cursor state of its own: outline it.
+          Rectangle {
+            anchors.fill: parent
+            anchors.margins: -Style.space(4)
+            visible: !!view.box && view.cursorKey === "box" + view.box.n + "SliderValue"
+            color: "transparent"
+            radius: Style.space(4)
+            border.width: 1
+            border.color: view.foreground
+          }
         }
       }
     }

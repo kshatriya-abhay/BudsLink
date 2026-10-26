@@ -14,6 +14,8 @@ Flow {
   property string value: ""
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
+  // Keyboard cursor: index of the chip to highlight, -1 for none.
+  property int cursorIndex: -1
 
   signal changed(string value)
 
@@ -24,6 +26,8 @@ Flow {
 
     delegate: Button {
       required property var modelData
+      required property int index
+      hasCursor: index === root.cursorIndex
       text: String(modelData.label)
       selected: String(modelData.value) === root.value
       bordered: true
