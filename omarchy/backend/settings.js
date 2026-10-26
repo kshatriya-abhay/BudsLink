@@ -21,7 +21,7 @@ function compileSchema(repoRoot, schemaDir) {
         throw new Error(`glib-compile-schemas failed: ${stderr?.trim()}`);
 }
 
-export function createSettings(repoRoot, stateDir) {
+export function createSettings(repoRoot, stateDir, {memory = false} = {}) {
     const schemaDir = GLib.build_filenamev([stateDir, 'schemas']);
     compileSchema(repoRoot, schemaDir);
 
@@ -31,8 +31,10 @@ export function createSettings(repoRoot, stateDir) {
     if (!schema)
         throw new Error(`schema ${SCHEMA_ID} not found in ${schemaDir}`);
 
-    const backend = Gio.keyfile_settings_backend_new(
-        GLib.build_filenamev([stateDir, 'settings.ini']), '/', null);
+    // Demo mode keeps its settings in memory, apart from the real ones.
+    const backend = memory
+        ? Gio.memory_settings_backend_new()
+        : Gio.keyfile_settings_backend_new(GLib.build_filenamev([stateDir, 'settings.ini']), '/', null);
 
     return new Gio.Settings({settings_schema: schema, backend});
 }
