@@ -57,6 +57,33 @@ Panel {
     }
   }
 
+  // ---- keyboard navigation (single view) ----
+  // One cursor over the device dropdown (when there is a choice) followed
+  // by the device view's rows. up/down move it, left/right walk chips or
+  // nudge a slider, Enter/space activates.
+  readonly property bool hasDropdown: !galleryMode && selectable.length > 1
+  readonly property int rowOffset: hasDropdown ? 1 : 0
+  readonly property int navCount: rowOffset + singleView.focusRows.length
+  property int navIndex: 0
+
+  function navTo(i) {
+    navIndex = Math.max(0, Math.min(navCount - 1, i))
+    singleView.focusRow(navIndex - rowOffset)
+  }
+
+  // Start on the noise control row when there is one, else the first row.
+  function navToDefault() {
+    var rows = singleView.focusRows
+    for (var i = 0; i < rows.length; i++)
+      if (rows[i].type === "choice") { navTo(i + rowOffset); return }
+    navTo(0)
+  }
+
+  onOpenedChanged: if (opened) navToDefault()
+  onGalleryModeChanged: if (opened && !galleryMode) navToDefault()
+  // Rows come and go (device switched, mode changed): keep the cursor in range.
+  onNavCountChanged: if (opened && !galleryMode) navTo(navIndex)
+
   function turnPage(delta) {
     if (service && galleryMode) service.setGalleryPage(service.galleryPage + delta)
   }
@@ -99,8 +126,18 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onMoveRequested: function(dx, dy) {
-        if (dx !== 0) root.turnPage(dx)
-        else if (dy !== 0) flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY + dy * Style.space(60)))
+        if (root.galleryMode) {
+          if (dx !== 0) root.turnPage(dx)
+          else if (dy !== 0) flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY + dy * Style.space(60)))
+          return
+        }
+        if (dy !== 0) root.navTo(root.navIndex + dy)
+        else if (dx !== 0 && root.navIndex >= root.rowOffset) singleView.moveSideways(dx)
+      }
+      onActivateRequested: {
+        if (root.galleryMode) return
+        if (root.hasDropdown && root.navIndex === 0) deviceDropdown.open()
+        else singleView.activate()
       }
       onTextKey: function(t) {
         if ((t === "m" || t === "M") && root.service && !root.galleryMode) root.service.cycle()
@@ -228,8 +265,10 @@ Panel {
           }
 
           Dropdown {
+            id: deviceDropdown
             width: parent.width
-            visible: !root.galleryMode && root.selectable.length > 1
+            visible: root.hasDropdown
+            hasCursor: root.hasDropdown && root.navIndex === 0
             showLabel: false
             options: root.selectable.map(function(d) { return { value: d.path, label: d.alias } })
             value: root.device ? root.device.path : ""
@@ -239,6 +278,7 @@ Panel {
           }
 
           DeviceView {
+            id: singleView
             width: parent.width
             visible: !root.galleryMode
             showTitle: root.selectable.length === 1
