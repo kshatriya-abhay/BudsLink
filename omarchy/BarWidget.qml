@@ -21,13 +21,17 @@ Panel {
   readonly property var config: info.config || null
   readonly property var state: info.state || null
   readonly property bool ready: !!device && device.ready && !!config && !!state
-  readonly property bool controls: !!device && device.controls !== false
 
-  readonly property var batteryRows: ready ? Model.batteryRows(config, state) : []
   readonly property int level: ready ? Model.barLevel(config, state) : -1
   readonly property var toggle1: ready ? Model.toggleRow(config, state, 1) : null
-  readonly property var toggle2: ready ? Model.toggleRow(config, state, 2) : null
-  readonly property var box: ready ? Model.optionsBox(config, state) : null
+
+  // Demo gallery: a 3x2 grid of devices, a page at a time.
+  readonly property bool galleryMode: !!service && service.demo && service.gallery
+  readonly property int galleryColumns: 3
+  readonly property real tileGap: Style.space(24)
+  // Tiles share the width the panel actually gets (it can be narrower than
+  // asked for on small screens).
+  readonly property real tileWidth: Math.floor((column.width - tileGap * (galleryColumns - 1)) / galleryColumns)
 
   // ---- settings (this widget's shell.json entry) ----
   readonly property bool showPercent: setting("showPercent", true) !== false
@@ -44,8 +48,17 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
-  function uiAction(action, value) {
-    if (service && device) service.uiAction(device.path, action, value)
+  // Dev tooling (IPC `snapshot <file>`): render the open panel's whole
+  // content to a PNG, including what is scrolled out of view.
+  Connections {
+    target: root.service
+    function onSnapshotRequested(path) {
+      if (root.opened) column.grabToImage(function(result) { result.saveToFile(path) })
+    }
+  }
+
+  function turnPage(delta) {
+    if (service && galleryMode) service.setGalleryPage(service.galleryPage + delta)
   }
 
   WidgetButton {
@@ -75,337 +88,201 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(340))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(640))
+    contentWidth: panel.fittedContentWidth(root.galleryMode
+      ? Style.space(320) * root.galleryColumns + root.tileGap * (root.galleryColumns - 1)
+      : Style.space(340))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(root.galleryMode ? 1400 : 640))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
+      onMoveRequested: function(dx, dy) {
+        if (dx !== 0) root.turnPage(dx)
+        else if (dy !== 0) flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY + dy * Style.space(60)))
+      }
       onTextKey: function(t) {
-        if ((t === "m" || t === "M") && root.service) root.service.cycle()
+        if ((t === "m" || t === "M") && root.service && !root.galleryMode) root.service.cycle()
       }
 
-      Column {
-        id: column
+      // Scrolls when the content is taller than the screen allows.
+      Flickable {
+        id: flick
         anchors.fill: parent
-        spacing: Style.space(12)
+        contentWidth: width
+        contentHeight: column.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        ScrollBar.vertical: ScrollBar { policy: flick.contentHeight > flick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
 
-        Text {
-          width: parent.width
-          visible: !!root.service && root.service.demo
-          text: "Demo mode: every model BudsLink knows, with fake data. Nothing is sent to any device. Turn off with: omarchy-shell kshatriya-abhay.buds demo off"
-          color: root.urgent
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          wrapMode: Text.WordWrap
-        }
-
-        // ---------- Device: dropdown when there is a choice ----------
-        Dropdown {
-          width: parent.width
-          visible: root.selectable.length > 1
-          showLabel: false
-          options: root.selectable.map(function(d) { return { value: d.path, label: d.alias } })
-          value: root.device ? root.device.path : ""
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          onChanged: function(value) { if (root.service) root.service.select(value) }
-        }
-
-        Text {
-          width: parent.width
-          visible: root.selectable.length === 1
-          text: root.device ? root.device.alias : ""
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.title
-          font.bold: true
-          elide: Text.ElideRight
-        }
-
-        Text {
-          width: parent.width
-          visible: !!root.device && !!root.device.model
-          text: root.device && root.device.model ? root.device.model : ""
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-        }
-
-        // ---------- Controls switch: off = read-only ----------
-        Item {
-          width: parent.width
-          visible: !!root.device
-          height: Math.max(controlsLabel.implicitHeight, controlsSwitch.implicitHeight)
-
-          Column {
-            anchors.left: parent.left
-            anchors.right: controlsSwitch.left
-            anchors.verticalCenter: parent.verticalCenter
-            Text {
-              id: controlsLabel
-              text: "Controls"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-            }
-            Text {
-              visible: !root.controls
-              text: "Read-only: nothing is sent to these earbuds"
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
-
-          ToggleSwitch {
-            id: controlsSwitch
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            checked: root.controls
-            foreground: root.foreground
-            onToggled: if (root.service && root.device) root.service.setControls(root.device.path, !root.controls)
-          }
-        }
-
-        // ---------- Battery ----------
         Column {
-          id: batteryColumn
-          width: parent.width
-          spacing: Style.space(6)
-          visible: root.batteryRows.length > 0
+          id: column
+          width: flick.width
+          spacing: Style.space(12)
 
-          FontMetrics {
-            id: batteryFont
+          Text {
+            width: parent.width
+            visible: !!root.service && root.service.demo
+            text: "Demo mode: every model BudsLink knows, with fake data. Nothing is sent to any device. Turn off with: omarchy-shell kshatriya-abhay.buds demo off"
+            color: root.urgent
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
           }
 
-          // Label column as wide as the widest label shown ("L", "Case",
-          // "Battery"), so the bar never starts on top of the text.
-          readonly property real labelWidth: {
-            var w = 0
-            for (var i = 0; i < root.batteryRows.length; i++)
-              w = Math.max(w, batteryFont.advanceWidth(root.batteryRows[i].label))
-            return Math.ceil(w) + Style.space(10)
-          }
+          // ---------- Demo gallery ----------
+          Item {
+            width: parent.width
+            visible: root.galleryMode
+            height: pager.implicitHeight
 
-          Repeater {
-            model: root.batteryRows
+            Row {
+              id: pager
+              spacing: Style.space(8)
+              anchors.left: parent.left
 
-            Item {
-              required property var modelData
-              width: column.width
-              height: Math.max(cellLabel.implicitHeight, cellValue.implicitHeight)
-              opacity: modelData.disconnected ? 0.5 : 1.0
-
+              Button {
+                text: "◀"
+                bordered: true
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                enabled: !!root.service && root.service.galleryPage > 0
+                onClicked: root.turnPage(-1)
+              }
+              Button {
+                text: "▶"
+                bordered: true
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                enabled: !!root.service && root.service.galleryPage < root.service.galleryPages - 1
+                onClicked: root.turnPage(1)
+              }
               Text {
-                id: cellLabel
-                text: modelData.label
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.service
+                  ? "Page " + (root.service.galleryPage + 1) + " of " + root.service.galleryPages
+                    + "  ·  ←/→ to turn  ·  " + root.selectable.length + " models"
+                  : ""
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
-                width: batteryColumn.labelWidth
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
               }
+            }
+
+            Button {
+              anchors.right: parent.right
+              text: "Single view"
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: if (root.service) root.service.gallery = false
+            }
+          }
+
+          Grid {
+            visible: root.galleryMode
+            columns: root.galleryColumns
+            columnSpacing: root.tileGap
+            rowSpacing: root.tileGap
+
+            Repeater {
+              model: root.galleryMode && root.service ? root.service.galleryDevices : []
 
               Rectangle {
-                anchors.left: cellLabel.right
-                anchors.right: cellValue.left
-                anchors.rightMargin: Style.space(8)
-                height: Style.space(6)
-                // Centre on the letters (half the cap height above the
-                // baseline), not on the text box, which also holds room
-                // for descenders and so sits lower than the glyphs.
-                y: Math.round(cellLabel.y + cellLabel.baselineOffset - batteryFont.capitalHeight / 2 - height / 2)
-                radius: height / 2
-                color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
+                required property var modelData
+                width: root.tileWidth
+                height: tile.implicitHeight + Style.space(24)
+                color: "transparent"
+                radius: Style.space(6)
+                border.width: 1
+                border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.2)
 
-                Rectangle {
-                  width: Math.max(parent.height, parent.width * Math.max(0, Math.min(100, modelData.level)) / 100)
-                  height: parent.height
-                  radius: parent.radius
-                  color: modelData.level <= root.lowBattery ? root.urgent : root.foreground
-                  Behavior on width { NumberAnimation { duration: 160 } }
+                DeviceView {
+                  id: tile
+                  x: Style.space(12)
+                  y: Style.space(12)
+                  width: parent.width - Style.space(24)
+                  service: root.service
+                  device: modelData
+                  info: root.service && root.service.data[modelData.path] ? root.service.data[modelData.path] : ({})
+                  bar: root.bar
+                  lowBattery: root.lowBattery
+                  foreground: root.foreground
+                  urgent: root.urgent
+                  dim: root.dim
+                  fontFamily: root.fontFamily
                 }
               }
-
-              Text {
-                id: cellValue
-                text: modelData.disconnected ? "–" : (modelData.charging ? "󰂄 " : "") + modelData.level + "%"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                horizontalAlignment: Text.AlignRight
-                width: Style.space(52)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-              }
             }
           }
-        }
 
-        // ---------- Toggle rows (noise control, …) ----------
-        Repeater {
-          model: [root.toggle1, root.toggle2].filter(function(r) { return !!r })
-
-          Column {
-            required property var modelData
-            width: column.width
-            spacing: Style.space(8)
-            enabled: root.controls
-            opacity: enabled ? 1.0 : 0.5
-
-            PanelSeparator { width: parent.width; foreground: root.foreground }
-            PanelSectionHeader {
-              width: parent.width
-              text: modelData.title
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-            ChoiceGroup {
-              width: parent.width
-              options: modelData.options
-              value: modelData.value
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onChanged: function(value) { root.uiAction("toggle" + modelData.n + "State", Number(value)) }
-            }
+          // ---------- Single device: dropdown when there is a choice ----------
+          Button {
+            visible: !!root.service && root.service.demo && !root.galleryMode
+            text: "Gallery view"
+            bordered: true
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: if (root.service) root.service.gallery = true
           }
-        }
 
-        // ---------- The one options box upstream shows ----------
-        // Widgets are drawn in the order the config declares them, as
-        // upstream does (e.g. Sony: Auto Ambient switch above its
-        // sensitivity picker).
-        Column {
-          width: parent.width
-          spacing: Style.space(8)
-          visible: !!root.box
-          enabled: root.controls
-          opacity: enabled ? 1.0 : 0.5
-
-          Repeater {
-            model: root.box ? root.box.order : []
-
-            Column {
-              id: boxPart
-              required property string modelData
-              width: column.width
-              spacing: Style.space(8)
-
-              // radio-button: optional title + choice chips
-              PanelSectionHeader {
-                width: parent.width
-                visible: boxPart.modelData === "radio-button" && !!root.box.radio && root.box.radio.title !== ""
-                text: root.box && root.box.radio ? root.box.radio.title : ""
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-              }
-              ChoiceGroup {
-                width: parent.width
-                visible: boxPart.modelData === "radio-button"
-                options: root.box && root.box.radio ? root.box.radio.options : []
-                value: root.box && root.box.radio ? root.box.radio.value : ""
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                onChanged: function(value) { root.uiAction("box" + root.box.n + "RadioButtonState", Number(value)) }
-              }
-
-              // check-button: one switch row per checkbox
-              Repeater {
-                model: boxPart.modelData === "check-button" && root.box ? root.box.checks : []
-
-                Item {
-                  required property var modelData
-                  width: column.width
-                  height: Math.max(checkLabel.implicitHeight, checkSwitch.implicitHeight)
-                  Text {
-                    id: checkLabel
-                    text: modelData.label
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                  }
-                  ToggleSwitch {
-                    id: checkSwitch
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    checked: modelData.checked
-                    foreground: root.foreground
-                    onToggled: root.uiAction("box" + root.box.n + "CheckButton" + modelData.index + "State", modelData.checked ? 0 : 1)
-                  }
-                }
-              }
-
-              // slider: optional title + slider
-              PanelSectionHeader {
-                width: parent.width
-                visible: boxPart.modelData === "slider" && !!root.box.slider && root.box.slider.title !== ""
-                text: root.box && root.box.slider ? root.box.slider.title : ""
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-              }
-              PanelSlider {
-                width: parent.width
-                visible: boxPart.modelData === "slider"
-                bar: root.bar
-                minimum: 0
-                maximum: 100
-                step: 1
-                integer: true
-                value: root.box && root.box.slider ? root.box.slider.value : 0
-                onReleased: function(value) { root.uiAction("box" + root.box.n + "SliderValue", Math.round(value)) }
-              }
-            }
+          Dropdown {
+            width: parent.width
+            visible: !root.galleryMode && root.selectable.length > 1
+            showLabel: false
+            options: root.selectable.map(function(d) { return { value: d.path, label: d.alias } })
+            value: root.device ? root.device.path : ""
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onChanged: function(value) { if (root.service) root.service.select(value) }
           }
-        }
 
-        // ---------- Empty and error states ----------
-        Text {
-          width: parent.width
-          visible: !root.running
-          text: "The Omarchy Buds backend is not running. It needs /usr/bin/gjs (package gjs)."
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          wrapMode: Text.WordWrap
-        }
+          DeviceView {
+            width: parent.width
+            visible: !root.galleryMode
+            showTitle: root.selectable.length === 1
+            service: root.service
+            device: root.device
+            info: root.info
+            bar: root.bar
+            lowBattery: root.lowBattery
+            foreground: root.foreground
+            urgent: root.urgent
+            dim: root.dim
+            fontFamily: root.fontFamily
+          }
 
-        Text {
-          width: parent.width
-          visible: root.running && root.selectable.length === 0
-          text: "No supported earbuds connected."
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          wrapMode: Text.WordWrap
-        }
+          // ---------- Empty and error states ----------
+          Text {
+            width: parent.width
+            visible: !root.running
+            text: "The Omarchy Buds backend is not running. It needs /usr/bin/gjs (package gjs)."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            wrapMode: Text.WordWrap
+          }
 
-        Text {
-          width: parent.width
-          visible: !!root.device && !root.ready
-          text: "Waiting for the earbuds… If this stays, this model isn't supported yet."
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          wrapMode: Text.WordWrap
-        }
+          Text {
+            width: parent.width
+            visible: root.running && root.selectable.length === 0
+            text: "No supported earbuds connected."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            wrapMode: Text.WordWrap
+          }
 
-        Text {
-          width: parent.width
-          visible: !!root.service && !!root.service.lastError && root.service.lastError.code === "profile-conflict"
-          text: "Another app (for example the BudsLink Flatpak) is using this earbud's control channel. Close it, then restart the shell."
-          color: root.urgent
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          wrapMode: Text.WordWrap
+          Text {
+            width: parent.width
+            visible: !!root.service && !!root.service.lastError && root.service.lastError.code === "profile-conflict"
+            text: "Another app (for example the BudsLink Flatpak) is using this earbud's control channel. Close it, then restart the shell."
+            color: root.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            wrapMode: Text.WordWrap
+          }
         }
       }
     }

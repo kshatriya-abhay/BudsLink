@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import "Model.js" as Model
 
 // Mounted once per shell session. Bar widgets are mounted once per monitor,
@@ -18,6 +19,23 @@ QtObject {
   // ---- what the backend reports ----
   property bool running: false
   property bool demo: false         // backend runs fake devices (see backend/demo.js)
+
+  // ---- demo gallery: the panel shows a grid of devices, a page at a time ----
+  property bool gallery: true
+  property int galleryPage: 0
+  readonly property int galleryPageSize: 6
+  readonly property int galleryPages: Math.max(1, Math.ceil(selectable.length / galleryPageSize))
+  readonly property var galleryDevices: selectable.slice(
+    Math.min(galleryPage, galleryPages - 1) * galleryPageSize,
+    Math.min(galleryPage, galleryPages - 1) * galleryPageSize + galleryPageSize)
+
+  // Dev tooling: the open panel renders its whole content (also the part
+  // scrolled out of view) to a PNG. The bar widget answers this.
+  signal snapshotRequested(string path)
+
+  function setGalleryPage(n) {
+    galleryPage = Math.max(0, Math.min(galleryPages - 1, n))
+  }
   property var devices: []          // [{path, address, alias, connected, family, ready, model, controls}]
   property var data: ({})           // path -> {config, state, settings, model}
   property var lastError: null      // {code, message, path?}
@@ -197,8 +215,24 @@ QtObject {
       root.setDemo(mode === "on")
       return "demo " + mode + ", restarting backend"
     }
+    function gallery(mode: string): string {
+      if (mode !== "on" && mode !== "off") return "usage: gallery on|off"
+      root.gallery = mode === "on"
+      return "gallery " + mode
+    }
+    function page(n: int): string {
+      root.setGalleryPage(n - 1)
+      return "page " + (root.galleryPage + 1) + "/" + root.galleryPages
+    }
+    // Returns the panel background colour: the PNG is transparent behind
+    // the content, so flatten it onto this to see it as on screen.
+    function snapshot(path: string): string {
+      root.snapshotRequested(path)
+      return String(Color.popups.background)
+    }
     function status(): string {
-      return JSON.stringify({ running: root.running, demo: root.demo, selected: root.selected, data: root.selectedData, devices: root.devices })
+      return JSON.stringify({ running: root.running, demo: root.demo,
+        gallery: { on: root.gallery, page: root.galleryPage + 1, pages: root.galleryPages }, selected: root.selected, data: root.selectedData, devices: root.devices })
     }
     function open(): void { if (root.shell) root.shell.summon(root.pluginId, "{}") }
     function close(): void { if (root.shell) root.shell.hide(root.pluginId) }
