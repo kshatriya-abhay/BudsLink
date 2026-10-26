@@ -46,6 +46,10 @@ Column {
     font.family: view.fontFamily
     font.pixelSize: Style.font.title
     font.bold: true
+    // Long names ("QuietComfort Ultra Headphones (2nd Gen)") wrap to a
+    // second line instead of being cut off.
+    wrapMode: Text.Wrap
+    maximumLineCount: 2
     elide: Text.ElideRight
   }
 
@@ -111,9 +115,10 @@ Column {
     }
 
     // As wide as the widest label shown ("L", "Case", "Battery"), so the
-    // bar never starts on top of the text.
+    // bar never starts on top of the text, and at least as wide as "Case",
+    // so bars line up whether or not a device reports its case.
     readonly property real labelWidth: {
-      var w = 0
+      var w = batteryFont.advanceWidth("Case")
       for (var i = 0; i < view.batteryRows.length; i++)
         w = Math.max(w, batteryFont.advanceWidth(view.batteryRows[i].label))
       return Math.ceil(w) + Style.space(10)
