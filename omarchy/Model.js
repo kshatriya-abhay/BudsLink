@@ -1,0 +1,151 @@
+.pragma library
+
+// Pure view logic for the Omarchy Buds panel: no QML imports, unit-tested
+// with node (omarchy/tests/model.test.js).
+//
+// `config` and `state` follow upstream's generic contract
+// (src/lib/dataHandler.js: createConfig / createProperties).
+
+var BATTERY_SLOTS = [1, 2, 3]
+
+// Devices the dropdown offers: connected and handled by a BudsLink family.
+function selectableDevices(devices) {
+  var out = []
+  for (var i = 0; i < (devices || []).length; i++) {
+    var d = devices[i]
+    if (d && d.connected && d.family) out.push(d)
+  }
+  return out
+}
+
+// Which device the panel shows: the user's pick while it stays connected,
+// else the current audio output, else the first one.
+function pickDevice(selectable, manualPath, audioAddress) {
+  if (!selectable || selectable.length === 0) return ""
+  var i
+  if (manualPath) {
+    for (i = 0; i < selectable.length; i++)
+      if (selectable[i].path === manualPath) return manualPath
+  }
+  if (audioAddress) {
+    var want = String(audioAddress).toUpperCase()
+    for (i = 0; i < selectable.length; i++)
+      if (String(selectable[i].address).toUpperCase() === want) return selectable[i].path
+  }
+  return selectable[0].path
+}
+
+// `wpctl inspect @DEFAULT_AUDIO_SINK@` -> Bluetooth address, or "".
+function audioAddressFromWpctl(text) {
+  var m = /api\.bluez5\.address\s*=\s*"([0-9A-Fa-f:]{17})"/.exec(String(text || ""))
+  return m ? m[1].toUpperCase() : ""
+}
+
+function batteryLabel(icon, slot) {
+  var name = String(icon || "")
+  if (/-left$/.test(name)) return "L"
+  if (/-right$/.test(name)) return "R"
+  if (slot === 3 || /case/.test(name)) return "Case"
+  return "Battery"
+}
+
+// Rows for the battery section. A slot shows when the device declares it
+// (an icon) and reports it; a disconnected bud shows only when the config
+// asks for it.
+function batteryRows(config, state) {
+  var rows = []
+  if (!config || !state) return rows
+  for (var i = 0; i < BATTERY_SLOTS.length; i++) {
+    var n = BATTERY_SLOTS[i]
+    var icon = config["battery" + n + "Icon"]
+    if (!icon) continue
+    var status = String(state["battery" + n + "Status"] || "not-reported")
+    if (status === "not-reported") continue
+    var disconnected = status === "disconnected"
+    if (disconnected && !config["battery" + n + "ShowOnDisconnect"]) continue
+    rows.push({
+      slot: n,
+      label: batteryLabel(icon, n),
+      level: Number(state["battery" + n + "Level"]) || 0,
+      charging: status === "charging",
+      disconnected: disconnected
+    })
+  }
+  return rows
+}
+
+// The number next to the bar icon: the emptiest bud that is reporting.
+function barLevel(config, state) {
+  var rows = batteryRows(config, state)
+  var best = -1
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].disconnected || rows[i].label === "Case") continue
+    if (best < 0 || rows[i].level < best) best = rows[i].level
+  }
+  if (best < 0 && state && state.computedBatteryLevel > 0) best = Number(state.computedBatteryLevel)
+  return best
+}
+
+// One of the two toggle rows (noise control, usually). Values are the
+// 1-based button index upstream expects in a toggleNState ui-action.
+function toggleRow(config, state, n) {
+  if (!config || !state || !state["toggle" + n + "Visible"]) return null
+  var options = []
+  for (var b = 1; b <= 4; b++) {
+    var name = config["toggle" + n + "Button" + b + "Name"]
+    if (name) options.push({ value: String(b), label: String(name) })
+  }
+  if (options.length < 2) return null
+  return {
+    n: n,
+    title: String(config["toggle" + n + "Title"] || ""),
+    options: options,
+    value: String(state["toggle" + n + "State"] || 0)
+  }
+}
+
+// Label of the active button in a toggle row ("" when none).
+function activeLabel(row) {
+  if (!row) return ""
+  for (var i = 0; i < row.options.length; i++)
+    if (row.options[i].value === row.value) return row.options[i].label
+  return ""
+}
+
+// Next value when cycling a toggle row (keybind, right-click).
+function nextValue(row) {
+  if (!row || row.options.length === 0) return ""
+  for (var i = 0; i < row.options.length; i++)
+    if (row.options[i].value === row.value) return row.options[(i + 1) % row.options.length].value
+  return row.options[0].value
+}
+
+// The single options box upstream shows under the toggles (a slider, one
+// or two checkboxes, or 2-4 radio buttons), or null.
+function optionsBox(config, state) {
+  if (!config || !state) return null
+  var n = Number(state.optionsBoxVisible) || 0
+  if (n < 1 || n > 4) return null
+  var kinds = config["optionsBox" + n] || []
+  var kind = kinds.length > 0 ? String(kinds[0]) : ""
+  var box = { n: n, kind: kind, title: "" }
+  if (kind === "slider") {
+    box.title = String(config["box" + n + "SliderTitle"] || "")
+    box.value = Number(state["box" + n + "SliderValue"]) || 0
+  } else if (kind === "check-button") {
+    var titles = config["box" + n + "CheckButton"] || []
+    box.checks = []
+    for (var c = 0; c < titles.length && c < 2; c++)
+      box.checks.push({ index: c + 1, label: String(titles[c]), checked: Number(state["box" + n + "CheckButton" + (c + 1) + "State"]) === 1 })
+  } else if (kind === "radio-button") {
+    var names = config["box" + n + "RadioButton"] || []
+    box.title = String(config["box" + n + "RadioTitle"] || "")
+    box.options = []
+    for (var r = 0; r < names.length && r < 4; r++)
+      box.options.push({ value: String(r + 1), label: String(names[r]) })
+    box.value = String(state["box" + n + "RadioButtonState"] || 0)
+  } else {
+    return null
+  }
+  return box
+}
