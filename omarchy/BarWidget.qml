@@ -173,9 +173,25 @@ Panel {
 
         // ---------- Battery ----------
         Column {
+          id: batteryColumn
           width: parent.width
           spacing: Style.space(6)
           visible: root.batteryRows.length > 0
+
+          FontMetrics {
+            id: batteryFont
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          // Label column as wide as the widest label shown ("L", "Case",
+          // "Battery"), so the bar never starts on top of the text.
+          readonly property real labelWidth: {
+            var w = 0
+            for (var i = 0; i < root.batteryRows.length; i++)
+              w = Math.max(w, batteryFont.advanceWidth(root.batteryRows[i].label))
+            return Math.ceil(w) + Style.space(10)
+          }
 
           Repeater {
             model: root.batteryRows
@@ -183,7 +199,7 @@ Panel {
             Item {
               required property var modelData
               width: column.width
-              height: Style.space(16)
+              height: Math.max(cellLabel.implicitHeight, cellValue.implicitHeight)
               opacity: modelData.disconnected ? 0.5 : 1.0
 
               Text {
@@ -192,7 +208,7 @@ Panel {
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
-                width: Style.space(40)
+                width: batteryColumn.labelWidth
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
               }
@@ -201,8 +217,11 @@ Panel {
                 anchors.left: cellLabel.right
                 anchors.right: cellValue.left
                 anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
                 height: Style.space(6)
+                // Centre on the letters (half the cap height above the
+                // baseline), not on the text box, which also holds room
+                // for descenders and so sits lower than the glyphs.
+                y: Math.round(cellLabel.y + cellLabel.baselineOffset - batteryFont.capitalHeight / 2 - height / 2)
                 radius: height / 2
                 color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
 
