@@ -1,0 +1,106 @@
+// Tests for omarchy/Model.js.   node omarchy/tests/model.test.js
+// Model.js is a QML JavaScript library, so it is loaded without its
+// `.pragma library` line into a plain context.
+const fs = require('fs')
+const path = require('path')
+const vm = require('vm')
+const assert = require('assert/strict')
+
+const source = fs.readFileSync(path.join(__dirname, '..', 'Model.js'), 'utf8').replace(/^\.pragma library\s*$/m, '')
+const M = {}
+vm.runInNewContext(source, M)
+
+// Arrays made inside the VM context have their own prototype; compare as JSON.
+const plain = x => JSON.parse(JSON.stringify(x))
+
+let failed = 0
+function test(name, fn) {
+  try { fn(); console.log('ok   ' + name) } catch (e) { failed++; console.log('FAIL ' + name + '\n     ' + e.message) }
+}
+
+const air8 = { path: '/p/air8', address: '60:55:56:C4:1D:5E', connected: true, family: 'opoBuds' }
+const w5 = { path: '/p/w5', address: '84:9D:4B:3E:3B:5C', connected: true, family: 'opoBuds' }
+const speaker = { path: '/p/spk', address: '24:CF:24:10:1B:42', connected: true, family: null }
+const jlab = { path: '/p/jlab', address: '90:DA:07:9F:94:DE', connected: false, family: 'gfps' }
+
+test('selectable = connected and supported', () => {
+  assert.deepEqual(plain(M.selectableDevices([air8, speaker, jlab, w5]).map(d => d.path)), ['/p/air8', '/p/w5'])
+})
+
+test('pick: manual choice wins while connected', () => {
+  assert.equal(M.pickDevice([air8, w5], '/p/w5', '60:55:56:C4:1D:5E'), '/p/w5')
+})
+test('pick: audio output when no manual choice', () => {
+  assert.equal(M.pickDevice([air8, w5], '', '84:9d:4b:3e:3b:5c'), '/p/w5')
+})
+test('pick: stale manual choice falls back', () => {
+  assert.equal(M.pickDevice([air8], '/p/w5', ''), '/p/air8')
+})
+test('pick: nothing selectable', () => {
+  assert.equal(M.pickDevice([], '/p/w5', ''), '')
+})
+
+test('wpctl address parse', () => {
+  const text = '  * api.bluez5.address = "60:55:56:c4:1d:5e"\n  * api.bluez5.codec = "aac"'
+  assert.equal(M.audioAddressFromWpctl(text), '60:55:56:C4:1D:5E')
+  assert.equal(M.audioAddressFromWpctl('alsa sink'), '')
+})
+
+const config = {
+  battery1Icon: 'earbuds-stem-left', battery2Icon: 'earbuds-stem-right', battery3Icon: 'case-normal',
+  battery1ShowOnDisconnect: true, battery2ShowOnDisconnect: true, battery3ShowOnDisconnect: false,
+  toggle1Title: 'Noise Control', toggle1Button1Name: 'Off', toggle1Button2Name: 'Transparency',
+  toggle1Button3Name: 'Noise Cancellation', toggle1Button4Name: '',
+  optionsBox1: ['radio-button'], box1RadioTitle: 'Noise Cancellation Level',
+  box1RadioButton: ['Smart', 'Max', 'Moderate', 'Mild'],
+  optionsBox2: ['check-button'], box2CheckButton: ['Wind Noise Reduction', 'Enhance voices'],
+}
+const state = {
+  battery1Level: 90, battery1Status: 'discharging', battery2Level: 85, battery2Status: 'charging',
+  battery3Level: 60, battery3Status: 'disconnected', computedBatteryLevel: 85,
+  toggle1Visible: true, toggle1State: 3, optionsBoxVisible: 1, box1RadioButtonState: 4,
+  box2CheckButton1State: 1, box2CheckButton2State: 0,
+}
+
+test('battery rows: labels, charging, hidden disconnected case', () => {
+  assert.deepEqual(plain(M.batteryRows(config, state).map(r => [r.label, r.level, r.charging])),
+    [['L', 90, false], ['R', 85, true]])
+})
+test('battery rows: not-reported slots hidden', () => {
+  assert.equal(M.batteryRows(config, { ...state, battery2Status: 'not-reported' }).length, 1)
+})
+test('bar level = emptiest bud', () => {
+  assert.equal(M.barLevel(config, state), 85)
+})
+test('bar level falls back to computed level', () => {
+  assert.equal(M.barLevel({ battery1Icon: 'x' }, { battery1Status: 'not-reported', computedBatteryLevel: 40 }), 40)
+})
+
+test('toggle row: buttons, value and label', () => {
+  const row = M.toggleRow(config, state, 1)
+  assert.deepEqual(plain(row.options.map(o => o.label)), ['Off', 'Transparency', 'Noise Cancellation'])
+  assert.equal(row.value, '3')
+  assert.equal(M.activeLabel(row), 'Noise Cancellation')
+  assert.equal(M.nextValue(row), '1')
+})
+test('toggle row hidden when not visible', () => {
+  assert.equal(M.toggleRow(config, state, 2), null)
+})
+
+test('options box: radio', () => {
+  const box = M.optionsBox(config, state)
+  assert.equal(box.kind, 'radio-button')
+  assert.equal(box.title, 'Noise Cancellation Level')
+  assert.equal(box.options.length, 4)
+  assert.equal(box.value, '4')
+})
+test('options box: checks', () => {
+  const box = M.optionsBox(config, { ...state, optionsBoxVisible: 2 })
+  assert.deepEqual(plain(box.checks.map(c => [c.index, c.checked])), [[1, true], [2, false]])
+})
+test('options box: none', () => {
+  assert.equal(M.optionsBox(config, { ...state, optionsBoxVisible: 0 }), null)
+})
+
+if (failed) { console.log(`\n${failed} failed`); process.exit(1) }
+console.log('\nall passed')
