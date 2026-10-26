@@ -174,22 +174,31 @@ function modelName(m) {
     return m.name ?? airpodsNameMap.get(m.key) ?? m.key ?? m.modelId ?? m.id ?? 'unknown';
 }
 
-// Some families keep defined rows hidden until the buds report a mode
-// (state.toggleNVisible, optionsBoxVisible). With no buds, reveal what the
-// config defines so its layout can be checked. Demo only.
+// Two things real buds do that demo devices can't, emulated here on the
+// device's data handler (demo only):
 //
-// The reveal has to survive the device's own updates: device classes keep
-// their own copy of the state and push it whole (e.g. after a click), which
-// would hide the rows again. So the handler's setProps is wrapped to keep
-// revealed rows visible whenever the device reports them hidden.
-function revealDefined(handler) {
+// 1. Reveal rows. Some families keep defined rows hidden until the buds
+//    report a mode (toggleNVisible, optionsBoxVisible). With no buds, show
+//    what the config defines so its layout can be checked.
+// 2. Confirm actions. Many families send a command and update their state
+//    only when the buds confirm it (e.g. the AirPods ambient level slider),
+//    so without buds every control would snap back. The last value the user
+//    picked for each control is applied as if the buds had confirmed it.
+//
+// Device classes keep their own copy of the state and push it whole on
+// every update, which would undo both. So setProps is wrapped to re-apply
+// them on every push.
+const CONFIRMABLE = /^(toggle[12]State|box[1-4](SliderValue|CheckButton[12]State|RadioButtonState))$/;
+
+function emulateBuds(handler) {
     const config = handler.getConfig();
     const rows = [1, 2].filter(n =>
         [1, 2, 3, 4].filter(b => config[`toggle${n}Button${b}Name`]).length >= 2);
     const box = [1, 2, 3, 4].find(n => (config[`optionsBox${n}`] ?? []).length > 0);
+    const confirmed = {};
 
-    const reveal = props => {
-        const out = {...props};
+    const apply = props => {
+        const out = {...props, ...confirmed};
         for (const n of rows) {
             if (!out[`toggle${n}Visible`]) {
                 out[`toggle${n}Visible`] = true;
@@ -203,7 +212,20 @@ function revealDefined(handler) {
     };
 
     const setProps = handler.setProps.bind(handler);
-    handler.setProps = props => setProps(reveal(props));
+    handler.setProps = props => setProps(apply(props));
+
+    // Connected after the device's own handler, so the device acts first
+    // (and sends nothing, Bluetooth being cut off); then the "buds" confirm.
+    handler.connect('ui-action', (_h, name, value) => {
+        if (!CONFIRMABLE.test(name))
+            return;
+        confirmed[name] = value;
+        GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            handler.setProps(handler.getProps());
+            return GLib.SOURCE_REMOVE;
+        });
+    });
+
     handler.setProps(handler.getProps());
 }
 
@@ -256,7 +278,7 @@ export const DemoHost = GObject.registerClass({
                     device.updateBatteryProps?.(recipe.battery === 'opo' ? OPO_BATTERY : {...BATTERY});
                     recipe.after?.(device);
                     if (entry.dataHandler)
-                        revealDefined(entry.dataHandler);
+                        emulateBuds(entry.dataHandler);
                 } catch (e) {
                     entry.error = String(e?.message ?? e);
                     this._log(`demo: ${alias}: ${entry.error}`);
