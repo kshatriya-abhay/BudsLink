@@ -4,6 +4,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "components"
 
 // Bar icon + popup. Mounted once per monitor; all state lives in Service.qml.
 Panel {
@@ -247,7 +248,7 @@ Panel {
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
-            ButtonGroup {
+            ChoiceGroup {
               width: parent.width
               options: modelData.options
               value: modelData.value
@@ -274,7 +275,7 @@ Panel {
             fontFamily: root.fontFamily
           }
 
-          ButtonGroup {
+          ChoiceGroup {
             width: parent.width
             visible: !!root.box && !!root.box.radio
             options: root.box && root.box.radio ? root.box.radio.options : []
