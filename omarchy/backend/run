@@ -1,0 +1,7 @@
+#!/bin/bash
+# Start the Omarchy Buds backend with its own state folder
+# (~/.local/state/omarchy-buds): settings, compiled schema and logs.
+set -euo pipefail
+here="$(dirname "$(readlink -f "$0")")"
+export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy-buds"
+exec /usr/bin/gjs -m "$here/main.js" "$@"
