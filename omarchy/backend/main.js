@@ -15,6 +15,7 @@ import GLibUnix from 'gi://GLibUnix';
 
 import {createSettings} from './settings.js';
 import {Host} from './host.js';
+import {Bridge} from './bridge.js';
 import {initLogger} from '../../src/lib/devices/logger.js';
 
 // Upstream's device code awaits these; app.js sets them up the same way.
@@ -53,8 +54,10 @@ function budslinkVersion() {
 
 const loop = new GLib.MainLoop(null, false);
 let host = null;
+let bridge = null;
 
 function quit() {
+    bridge?.destroy();
     host?.destroy();
     loop.quit();
 }
@@ -96,15 +99,11 @@ function handleCommand(line) {
             host?.sync();
             break;
         default:
-            emit({t: 'error', code: 'unknown-command', message: String(cmd.cmd)});
+            if (bridge)
+                bridge.handle(cmd);
+            else
+                emit({t: 'error', code: 'not-started', message: String(cmd.cmd)});
     }
-}
-
-function publicDevice(d) {
-    return {
-        path: d.path, address: d.address, alias: d.alias, connected: d.connected,
-        family: d.family, pending: d.pending, ready: Boolean(d.dataHandler),
-    };
 }
 
 async function main() {
@@ -114,8 +113,9 @@ async function main() {
 
     emit({t: 'hello', proto: PROTO, budslink: budslinkVersion(), detectOnly});
 
+    bridge = new Bridge({settings, emit, stateDir});
     host = new Host({settings, extPath: repoRoot, detectOnly});
-    host.connect('devices-changed', (_h, list) => emit({t: 'devices', devices: list.map(publicDevice)}));
+    host.connect('devices-changed', (_h, list) => bridge.updateDevices(list));
     host.connect('notification', (_h, id, shown) => {
         if (shown)
             emit({t: 'error', code: 'profile-conflict', message: id});
