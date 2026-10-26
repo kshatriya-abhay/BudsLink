@@ -91,6 +91,16 @@ Panel {
         anchors.fill: parent
         spacing: Style.space(12)
 
+        Text {
+          width: parent.width
+          visible: !!root.service && root.service.demo
+          text: "Demo mode: every model BudsLink knows, with fake data. Nothing is sent to any device. Turn off with: omarchy-shell kshatriya-abhay.buds demo off"
+          color: root.urgent
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.WordWrap
+        }
+
         // ---------- Device: dropdown when there is a choice ----------
         Dropdown {
           width: parent.width

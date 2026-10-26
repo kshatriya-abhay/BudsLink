@@ -17,6 +17,7 @@ QtObject {
 
   // ---- what the backend reports ----
   property bool running: false
+  property bool demo: false         // backend runs fake devices (see backend/demo.js)
   property var devices: []          // [{path, address, alias, connected, family, ready, model, controls}]
   property var data: ({})           // path -> {config, state, settings, model}
   property var lastError: null      // {code, message, path?}
@@ -99,6 +100,7 @@ QtObject {
     switch (e.t) {
     case "hello":
       running = true
+      demo = e.demo === true
       break
     case "devices":
       devices = e.devices || []
@@ -131,6 +133,24 @@ QtObject {
       root.devices = []
       root.data = ({})
       restartTimer.restart()
+    }
+  }
+
+  // Demo mode is a flag file the backend reads at start; switching it
+  // restarts the backend.
+  readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy-buds"
+
+  function setDemo(on) {
+    demoSwitch.command = on
+      ? ["sh", "-c", "mkdir -p \"$1\" && touch \"$1/demo\"", "sh", stateDir]
+      : ["rm", "-f", stateDir + "/demo"]
+    demoSwitch.running = true
+  }
+
+  property Process demoSwitch: Process {
+    onExited: {
+      root.manualPath = ""
+      root.backend.running = false
     }
   }
 
@@ -172,8 +192,13 @@ QtObject {
       }
       return "not connected"
     }
+    function demo(mode: string): string {
+      if (mode !== "on" && mode !== "off") return "usage: demo on|off"
+      root.setDemo(mode === "on")
+      return "demo " + mode + ", restarting backend"
+    }
     function status(): string {
-      return JSON.stringify({ running: root.running, selected: root.selected, data: root.selectedData, devices: root.devices })
+      return JSON.stringify({ running: root.running, demo: root.demo, selected: root.selected, data: root.selectedData, devices: root.devices })
     }
     function open(): void { if (root.shell) root.shell.summon(root.pluginId, "{}") }
     function close(): void { if (root.shell) root.shell.hide(root.pluginId) }
