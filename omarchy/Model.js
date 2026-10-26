@@ -120,32 +120,39 @@ function nextValue(row) {
   return row.options[0].value
 }
 
-// The single options box upstream shows under the toggles (a slider, one
-// or two checkboxes, or 2-4 radio buttons), or null.
+// The options box upstream shows under the toggles, or null. One box can
+// hold one of each widget kind: a slider, 1-2 checkboxes and/or 2-4 radio
+// buttons (e.g. the ANC level picker plus a wind noise checkbox).
 function optionsBox(config, state) {
   if (!config || !state) return null
   var n = Number(state.optionsBoxVisible) || 0
   if (n < 1 || n > 4) return null
   var kinds = config["optionsBox" + n] || []
-  var kind = kinds.length > 0 ? String(kinds[0]) : ""
-  var box = { n: n, kind: kind, title: "" }
-  if (kind === "slider") {
-    box.title = String(config["box" + n + "SliderTitle"] || "")
-    box.value = Number(state["box" + n + "SliderValue"]) || 0
-  } else if (kind === "check-button") {
-    var titles = config["box" + n + "CheckButton"] || []
-    box.checks = []
-    for (var c = 0; c < titles.length && c < 2; c++)
-      box.checks.push({ index: c + 1, label: String(titles[c]), checked: Number(state["box" + n + "CheckButton" + (c + 1) + "State"]) === 1 })
-  } else if (kind === "radio-button") {
-    var names = config["box" + n + "RadioButton"] || []
-    box.title = String(config["box" + n + "RadioTitle"] || "")
-    box.options = []
-    for (var r = 0; r < names.length && r < 4; r++)
-      box.options.push({ value: String(r + 1), label: String(names[r]) })
-    box.value = String(state["box" + n + "RadioButtonState"] || 0)
-  } else {
-    return null
+  var box = { n: n, radio: null, checks: [], slider: null }
+  for (var k = 0; k < kinds.length; k++) {
+    var kind = String(kinds[k])
+    if (kind === "slider") {
+      box.slider = {
+        title: String(config["box" + n + "SliderTitle"] || ""),
+        value: Number(state["box" + n + "SliderValue"]) || 0
+      }
+    } else if (kind === "check-button") {
+      var titles = config["box" + n + "CheckButton"] || []
+      for (var c = 0; c < titles.length && c < 2; c++)
+        box.checks.push({ index: c + 1, label: String(titles[c]), checked: Number(state["box" + n + "CheckButton" + (c + 1) + "State"]) === 1 })
+    } else if (kind === "radio-button") {
+      var names = config["box" + n + "RadioButton"] || []
+      var options = []
+      for (var r = 0; r < names.length && r < 4; r++)
+        options.push({ value: String(r + 1), label: String(names[r]) })
+      if (options.length > 0)
+        box.radio = {
+          title: String(config["box" + n + "RadioTitle"] || ""),
+          options: options,
+          value: String(state["box" + n + "RadioButtonState"] || 0)
+        }
+    }
   }
+  if (!box.radio && !box.slider && box.checks.length === 0) return null
   return box
 }

@@ -51,7 +51,7 @@ const config = {
   battery1ShowOnDisconnect: true, battery2ShowOnDisconnect: true, battery3ShowOnDisconnect: false,
   toggle1Title: 'Noise Control', toggle1Button1Name: 'Off', toggle1Button2Name: 'Transparency',
   toggle1Button3Name: 'Noise Cancellation', toggle1Button4Name: '',
-  optionsBox1: ['radio-button'], box1RadioTitle: 'Noise Cancellation Level',
+  optionsBox1: ['radio-button', 'check-button'], box1CheckButton: ['Wind Noise Reduction'], box1RadioTitle: 'Noise Cancellation Level',
   box1RadioButton: ['Smart', 'Max', 'Moderate', 'Mild'],
   optionsBox2: ['check-button'], box2CheckButton: ['Wind Noise Reduction', 'Enhance voices'],
 }
@@ -87,16 +87,22 @@ test('toggle row hidden when not visible', () => {
   assert.equal(M.toggleRow(config, state, 2), null)
 })
 
-test('options box: radio', () => {
-  const box = M.optionsBox(config, state)
-  assert.equal(box.kind, 'radio-button')
-  assert.equal(box.title, 'Noise Cancellation Level')
-  assert.equal(box.options.length, 4)
-  assert.equal(box.value, '4')
+test('options box: radio and checkbox together (ANC level + wind noise)', () => {
+  const box = M.optionsBox(config, { ...state, box1CheckButton1State: 1 })
+  assert.equal(box.radio.title, 'Noise Cancellation Level')
+  assert.equal(box.radio.options.length, 4)
+  assert.equal(box.radio.value, '4')
+  assert.deepEqual(plain(box.checks.map(c => [c.label, c.checked])), [['Wind Noise Reduction', true]])
 })
-test('options box: checks', () => {
+test('options box: checks only', () => {
   const box = M.optionsBox(config, { ...state, optionsBoxVisible: 2 })
+  assert.equal(box.radio, null)
   assert.deepEqual(plain(box.checks.map(c => [c.index, c.checked])), [[1, true], [2, false]])
+})
+test('options box: slider', () => {
+  const box = M.optionsBox({ optionsBox3: ['slider'], box3SliderTitle: 'Level' }, { optionsBoxVisible: 3, box3SliderValue: 40 })
+  assert.equal(box.slider.title, 'Level')
+  assert.equal(box.slider.value, 40)
 })
 test('options box: none', () => {
   assert.equal(M.optionsBox(config, { ...state, optionsBoxVisible: 0 }), null)
