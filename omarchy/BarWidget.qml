@@ -258,24 +258,24 @@ Panel {
 
           PanelSectionHeader {
             width: parent.width
-            visible: !!root.box && root.box.title !== ""
-            text: root.box ? root.box.title : ""
+            visible: !!root.box && !!root.box.radio && root.box.radio.title !== ""
+            text: root.box && root.box.radio ? root.box.radio.title : ""
             foreground: root.foreground
             fontFamily: root.fontFamily
           }
 
           ButtonGroup {
             width: parent.width
-            visible: !!root.box && root.box.kind === "radio-button"
-            options: root.box && root.box.options ? root.box.options : []
-            value: root.box && root.box.value !== undefined ? String(root.box.value) : ""
+            visible: !!root.box && !!root.box.radio
+            options: root.box && root.box.radio ? root.box.radio.options : []
+            value: root.box && root.box.radio ? root.box.radio.value : ""
             foreground: root.foreground
             fontFamily: root.fontFamily
             onChanged: function(value) { root.uiAction("box" + root.box.n + "RadioButtonState", Number(value)) }
           }
 
           Repeater {
-            model: root.box && root.box.kind === "check-button" ? root.box.checks : []
+            model: root.box ? root.box.checks : []
 
             Item {
               required property var modelData
@@ -301,15 +301,23 @@ Panel {
             }
           }
 
+          PanelSectionHeader {
+            width: parent.width
+            visible: !!root.box && !!root.box.slider && root.box.slider.title !== ""
+            text: root.box && root.box.slider ? root.box.slider.title : ""
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
+
           PanelSlider {
             width: parent.width
-            visible: !!root.box && root.box.kind === "slider"
+            visible: !!root.box && !!root.box.slider
             bar: root.bar
             minimum: 0
             maximum: 100
             step: 1
             integer: true
-            value: root.box && root.box.kind === "slider" ? root.box.value : 0
+            value: root.box && root.box.slider ? root.box.slider.value : 0
             onReleased: function(value) { root.uiAction("box" + root.box.n + "SliderValue", Math.round(value)) }
           }
         }
