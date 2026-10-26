@@ -260,6 +260,9 @@ Panel {
         }
 
         // ---------- The one options box upstream shows ----------
+        // Widgets are drawn in the order the config declares them, as
+        // upstream does (e.g. Sony: Auto Ambient switch above its
+        // sensitivity picker).
         Column {
           width: parent.width
           spacing: Style.space(8)
@@ -267,69 +270,81 @@ Panel {
           enabled: root.controls
           opacity: enabled ? 1.0 : 0.5
 
-          PanelSectionHeader {
-            width: parent.width
-            visible: !!root.box && !!root.box.radio && root.box.radio.title !== ""
-            text: root.box && root.box.radio ? root.box.radio.title : ""
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-          }
-
-          ChoiceGroup {
-            width: parent.width
-            visible: !!root.box && !!root.box.radio
-            options: root.box && root.box.radio ? root.box.radio.options : []
-            value: root.box && root.box.radio ? root.box.radio.value : ""
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onChanged: function(value) { root.uiAction("box" + root.box.n + "RadioButtonState", Number(value)) }
-          }
-
           Repeater {
-            model: root.box ? root.box.checks : []
+            model: root.box ? root.box.order : []
 
-            Item {
-              required property var modelData
+            Column {
+              id: boxPart
+              required property string modelData
               width: column.width
-              height: Math.max(checkLabel.implicitHeight, checkSwitch.implicitHeight)
-              Text {
-                id: checkLabel
-                text: modelData.label
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-              ToggleSwitch {
-                id: checkSwitch
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                checked: modelData.checked
+              spacing: Style.space(8)
+
+              // radio-button: optional title + choice chips
+              PanelSectionHeader {
+                width: parent.width
+                visible: boxPart.modelData === "radio-button" && !!root.box.radio && root.box.radio.title !== ""
+                text: root.box && root.box.radio ? root.box.radio.title : ""
                 foreground: root.foreground
-                onToggled: root.uiAction("box" + root.box.n + "CheckButton" + modelData.index + "State", modelData.checked ? 0 : 1)
+                fontFamily: root.fontFamily
+              }
+              ChoiceGroup {
+                width: parent.width
+                visible: boxPart.modelData === "radio-button"
+                options: root.box && root.box.radio ? root.box.radio.options : []
+                value: root.box && root.box.radio ? root.box.radio.value : ""
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                onChanged: function(value) { root.uiAction("box" + root.box.n + "RadioButtonState", Number(value)) }
+              }
+
+              // check-button: one switch row per checkbox
+              Repeater {
+                model: boxPart.modelData === "check-button" && root.box ? root.box.checks : []
+
+                Item {
+                  required property var modelData
+                  width: column.width
+                  height: Math.max(checkLabel.implicitHeight, checkSwitch.implicitHeight)
+                  Text {
+                    id: checkLabel
+                    text: modelData.label
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+                  ToggleSwitch {
+                    id: checkSwitch
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    checked: modelData.checked
+                    foreground: root.foreground
+                    onToggled: root.uiAction("box" + root.box.n + "CheckButton" + modelData.index + "State", modelData.checked ? 0 : 1)
+                  }
+                }
+              }
+
+              // slider: optional title + slider
+              PanelSectionHeader {
+                width: parent.width
+                visible: boxPart.modelData === "slider" && !!root.box.slider && root.box.slider.title !== ""
+                text: root.box && root.box.slider ? root.box.slider.title : ""
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+              }
+              PanelSlider {
+                width: parent.width
+                visible: boxPart.modelData === "slider"
+                bar: root.bar
+                minimum: 0
+                maximum: 100
+                step: 1
+                integer: true
+                value: root.box && root.box.slider ? root.box.slider.value : 0
+                onReleased: function(value) { root.uiAction("box" + root.box.n + "SliderValue", Math.round(value)) }
               }
             }
-          }
-
-          PanelSectionHeader {
-            width: parent.width
-            visible: !!root.box && !!root.box.slider && root.box.slider.title !== ""
-            text: root.box && root.box.slider ? root.box.slider.title : ""
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-          }
-
-          PanelSlider {
-            width: parent.width
-            visible: !!root.box && !!root.box.slider
-            bar: root.bar
-            minimum: 0
-            maximum: 100
-            step: 1
-            integer: true
-            value: root.box && root.box.slider ? root.box.slider.value : 0
-            onReleased: function(value) { root.uiAction("box" + root.box.n + "SliderValue", Math.round(value)) }
           }
         }
 

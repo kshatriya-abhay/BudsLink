@@ -123,20 +123,24 @@ function nextValue(row) {
 // The options box upstream shows under the toggles, or null. One box can
 // hold one of each widget kind: a slider, 1-2 checkboxes and/or 2-4 radio
 // buttons (e.g. the ANC level picker plus a wind noise checkbox).
+// `order` lists the kinds present in the order the config declares them,
+// which is the order upstream draws them in (src/lib/widgets/optionsBox.js).
 function optionsBox(config, state) {
   if (!config || !state) return null
   var n = Number(state.optionsBoxVisible) || 0
   if (n < 1 || n > 4) return null
   var kinds = config["optionsBox" + n] || []
-  var box = { n: n, radio: null, checks: [], slider: null }
+  var box = { n: n, radio: null, checks: [], slider: null, order: [] }
   for (var k = 0; k < kinds.length; k++) {
     var kind = String(kinds[k])
     if (kind === "slider") {
+      box.order.push(kind)
       box.slider = {
         title: String(config["box" + n + "SliderTitle"] || ""),
         value: Number(state["box" + n + "SliderValue"]) || 0
       }
     } else if (kind === "check-button") {
+      box.order.push(kind)
       var titles = config["box" + n + "CheckButton"] || []
       for (var c = 0; c < titles.length && c < 2; c++)
         box.checks.push({ index: c + 1, label: String(titles[c]), checked: Number(state["box" + n + "CheckButton" + (c + 1) + "State"]) === 1 })
@@ -145,6 +149,7 @@ function optionsBox(config, state) {
       var options = []
       for (var r = 0; r < names.length && r < 4; r++)
         options.push({ value: String(r + 1), label: String(names[r]) })
+      if (options.length > 0) box.order.push(kind)
       if (options.length > 0)
         box.radio = {
           title: String(config["box" + n + "RadioTitle"] || ""),
