@@ -4,9 +4,11 @@
 // Start it through ./run, which points XDG_STATE_HOME at our own state
 // folder before GLib caches it.
 //
-//   run [--detect-only] [--verbose]
+//   run [--detect-only] [--demo] [--verbose]
 //
 // --detect-only  identify device families but never connect to a device
+// --demo         one fake device per known model, Bluetooth cut off
+//                (also enabled by an empty file at $STATE/demo)
 // --verbose      enable upstream's runtime log ($STATE/log/runtime.log);
 //                so does an empty file at $STATE/verbose
 import Gio from 'gi://Gio';
@@ -17,6 +19,7 @@ import GLibUnix from 'gi://GLibUnix';
 import {createSettings} from './settings.js';
 import {Host} from './host.js';
 import {Bridge} from './bridge.js';
+import {DemoHost} from './demo.js';
 import {initLogger} from '../../src/lib/devices/logger.js';
 
 // Upstream's device code awaits these; app.js sets them up the same way.
@@ -36,6 +39,8 @@ const detectOnly = args.has('--detect-only');
 const repoRoot = GLib.path_get_dirname(GLib.path_get_dirname(
     GLib.path_get_dirname(Gio.File.new_for_uri(import.meta.url).get_path())));
 const stateDir = GLib.get_user_state_dir();
+const flagFile = name => GLib.file_test(GLib.build_filenamev([stateDir, name]), GLib.FileTest.EXISTS);
+const demo = args.has('--demo') || flagFile('demo');
 const verbose = args.has('--verbose') ||
     GLib.file_test(GLib.build_filenamev([stateDir, 'verbose']), GLib.FileTest.EXISTS);
 
@@ -109,14 +114,16 @@ function handleCommand(line) {
 }
 
 async function main() {
-    const settings = createSettings(repoRoot, stateDir);
+    const settings = createSettings(repoRoot, stateDir, {memory: demo});
     settings.set_boolean('logging-enabled', verbose);
     initLogger(settings);
 
-    emit({t: 'hello', proto: PROTO, budslink: budslinkVersion(), detectOnly});
+    emit({t: 'hello', proto: PROTO, budslink: budslinkVersion(), detectOnly, demo});
 
     bridge = new Bridge({settings, emit, stateDir});
-    host = new Host({settings, extPath: repoRoot, detectOnly});
+    host = demo
+        ? new DemoHost({settings, extPath: repoRoot, log: m => emit({t: 'error', code: 'demo', message: m})})
+        : new Host({settings, extPath: repoRoot, detectOnly});
     host.connect('devices-changed', (_h, list) => bridge.updateDevices(list));
     host.connect('notification', (_h, id, shown) => {
         if (shown)
