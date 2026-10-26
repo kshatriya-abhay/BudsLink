@@ -94,6 +94,12 @@ test('options box: radio and checkbox together (ANC level + wind noise)', () => 
   assert.equal(box.radio.value, '4')
   assert.deepEqual(plain(box.checks.map(c => [c.label, c.checked])), [['Wind Noise Reduction', true]])
 })
+test('options box: keeps the declared widget order', () => {
+  const sony = { optionsBox2: ['check-button', 'radio-button'], box2CheckButton: ['Auto Ambient'],
+    box2RadioTitle: 'Auto Ambient Sensitivity', box2RadioButton: ['Standard', 'High', 'Low'] }
+  assert.deepEqual(plain(M.optionsBox(sony, { optionsBoxVisible: 2 }).order), ['check-button', 'radio-button'])
+  assert.deepEqual(plain(M.optionsBox(config, state).order), ['radio-button', 'check-button'])
+})
 test('options box: checks only', () => {
   const box = M.optionsBox(config, { ...state, optionsBoxVisible: 2 })
   assert.equal(box.radio, null)
