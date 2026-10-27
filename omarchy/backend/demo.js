@@ -49,29 +49,37 @@ const DEMO_PATH_PREFIX = '/org/bluez/hci0/dev_00_DE_00_00_';
 // ---- cut Bluetooth off (this process only) ----------------------------------
 
 let sentCount = 0;
-function silence(klass) {
-    klass.prototype.startSocket = async function () {};
-    klass.prototype.sendMessage = async function () {
-        sentCount++;
-    };
-}
-silence(SocketHandler);
-silence(GattHandler);
-
 const fakeBluez = new Map(); // object path -> {Name, Alias, Modalias, UUIDs, ...}
 const BLUEZ_TYPES = {
     Alias: 's', Name: 's', Modalias: 's', Icon: 's',
     Connected: 'b', Paired: 'b', ServicesResolved: 'b', UUIDs: 'as',
 };
-const realGetCached = Gio.DBusProxy.prototype.get_cached_property;
-Gio.DBusProxy.prototype.get_cached_property = function (name) {
-    const props = fakeBluez.get(this.g_object_path);
-    if (props && this.g_interface_name === 'org.bluez.Device1') {
-        const type = BLUEZ_TYPES[name];
-        return type && props[name] !== undefined ? new GLib.Variant(type, props[name]) : null;
+
+// Applied only when the demo host starts. main.js imports this module in
+// every mode, so nothing here may touch Bluetooth at import time.
+let cutOff = false;
+function cutOffBluetooth() {
+    if (cutOff)
+        return;
+    cutOff = true;
+
+    for (const klass of [SocketHandler, GattHandler]) {
+        klass.prototype.startSocket = async function () {};
+        klass.prototype.sendMessage = async function () {
+            sentCount++;
+        };
     }
-    return realGetCached.call(this, name);
-};
+
+    const realGetCached = Gio.DBusProxy.prototype.get_cached_property;
+    Gio.DBusProxy.prototype.get_cached_property = function (name) {
+        const props = fakeBluez.get(this.g_object_path);
+        if (props && this.g_interface_name === 'org.bluez.Device1') {
+            const type = BLUEZ_TYPES[name];
+            return type && props[name] !== undefined ? new GLib.Variant(type, props[name]) : null;
+        }
+        return realGetCached.call(this, name);
+    };
+}
 
 const fakeProfileManager = {
     acquireFd: async () => -1,
@@ -248,6 +256,7 @@ export const DemoHost = GObject.registerClass({
     }
 
     async start() {
+        cutOffBluetooth();
         airpodsNameMap = airpodsNames(this._extPath);
         let index = 0;
         for (const recipe of RECIPES) {
