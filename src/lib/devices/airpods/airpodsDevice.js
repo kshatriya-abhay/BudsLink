@@ -66,15 +66,6 @@ export const AirpodsDevice = GObject.registerClass({
         this._budInEar = false;
         this._bothBudsInEar = false;
         this._battInfoRecieved = false;
-        this._previousOnDestroyVolume = -1;
-        this._ignoreGsettingsChange = false;
-
-        const attStrings = this._settings.get_strv('attenuated-on-destroy-info');
-        if (attStrings.length > 0) {
-            const {path, timestamp, volume} = JSON.parse(attStrings[0]);
-            if (path === this._devicePath && now - timestamp <= 500)
-                this._previousOnDestroyVolume = volume;
-        }
 
         this._callbacks = {
             updateBatteryProps: this.updateBatteryProps.bind(this),
