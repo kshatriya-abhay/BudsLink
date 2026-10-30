@@ -124,7 +124,9 @@ Panel {
     contentWidth: panel.fittedContentWidth(root.galleryMode
       ? Style.space(320) * root.galleryColumns + root.tileGap * (root.galleryColumns - 1)
       : Style.space(340))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(root.galleryMode ? 1400 : 640))
+    // No cap of our own: the shell limits it to the space available on
+    // screen, and the content scrolls only beyond that.
+    contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
