@@ -37,6 +37,12 @@ Panel {
   readonly property bool showPercent: setting("showPercent", true) !== false
   readonly property bool hideWhenDisconnected: setting("hideWhenDisconnected", true) !== false
   readonly property int lowBattery: Number(setting("lowBattery", 15))
+  // Feature switches the user doesn't want offered, for every device.
+  // An empty selection shows them all.
+  readonly property var hiddenFeatures: {
+    var v = setting("hiddenFeatures", ["auto-answer", "dual-connection"])
+    return Array.isArray(v) ? v : []
+  }
 
   readonly property bool hidden: hideWhenDisconnected && selectable.length === 0 && !opened
   visible: !hidden
@@ -245,6 +251,7 @@ Panel {
                   info: root.service && root.service.data[modelData.path] ? root.service.data[modelData.path] : ({})
                   bar: root.bar
                   lowBattery: root.lowBattery
+                  hiddenFeatures: root.hiddenFeatures
                   foreground: root.foreground
                   urgent: root.urgent
                   dim: root.dim
@@ -287,6 +294,7 @@ Panel {
             info: root.info
             bar: root.bar
             lowBattery: root.lowBattery
+            hiddenFeatures: root.hiddenFeatures
             foreground: root.foreground
             urgent: root.urgent
             dim: root.dim

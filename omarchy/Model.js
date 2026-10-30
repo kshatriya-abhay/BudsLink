@@ -194,7 +194,9 @@ function words(key) {
 // Returns null when there is nothing to show, else
 // { eq: {options, value} | null, switches: [{key, label, checked}],
 //   bass: {value, min, max} | null }
-function opoSettings(family, model, settings) {
+// `hidden` lists settings keys the user chose not to see (plugin setting
+// "hiddenFeatures"); they are left as they are on the buds.
+function opoSettings(family, model, settings, hidden) {
   if (family !== "opoBuds" || !model || !settings) return null
   var out = { eq: null, switches: [], bass: null }
 
@@ -212,13 +214,16 @@ function opoSettings(family, model, settings) {
 
   for (var i = 0; i < OPO_SWITCHES.length; i++) {
     var sw = OPO_SWITCHES[i]
+    if (hidden && hidden.indexOf(sw.key) >= 0) continue
     if (model[sw.flag] && settings[sw.key] !== undefined)
       out.switches.push({ key: sw.key, label: sw.label, checked: settings[sw.key] === true })
   }
 
   // Bass level (-5..+5) exists only on models using the bass engine
   // commands, and only means something while dynamic bass is on.
-  if (model.dynamicBass && model.dynamicBassOpo && settings["bass-level"] !== undefined && settings["dynamic-bass"] === true)
+  // Hidden together with its dynamic bass switch.
+  var bassHidden = hidden && hidden.indexOf("dynamic-bass") >= 0
+  if (!bassHidden && model.dynamicBass && model.dynamicBassOpo && settings["bass-level"] !== undefined && settings["dynamic-bass"] === true)
     out.bass = { value: Number(settings["bass-level"]) || 0, min: -5, max: 5 }
 
   if (!out.eq && out.switches.length === 0 && !out.bass) return null
