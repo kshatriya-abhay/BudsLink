@@ -14,6 +14,13 @@ export const JlabBudsModelList = [
         pattern: /^JLab JBuds Lux ANC/i,
         batteryType: 1,
         icon: 'headphone1',
+        // The presets the JLab app offers (the device stores more, 0..6).
+        eqPresets: [
+            {id: 0x00, label: 'EQ 1'},
+            {id: 0x01, label: 'EQ 2'},
+            {id: 0x02, label: 'EQ 3'},
+            {id: 0x06, label: 'Custom'},
+        ],
     },
 ];
 
