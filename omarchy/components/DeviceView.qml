@@ -146,7 +146,8 @@ Column {
 
   Text {
     width: parent.width
-    visible: !!view.device && !!view.device.model
+    // The model name only when it says more than the device name.
+    visible: !!view.device && !!view.device.model && !Model.sameName(view.device.model, view.device.alias)
     text: view.device && view.device.model ? view.device.model : ""
     color: view.dim
     font.family: view.fontFamily
