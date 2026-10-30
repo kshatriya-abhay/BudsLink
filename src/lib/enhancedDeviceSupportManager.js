@@ -39,6 +39,7 @@ import {
 import {
     SoundcoreDevice, isSoundcore, DeviceTypeSoundcore
 } from './devices/soundcore/soundcoreDevice.js';
+import {JlabBudsDevice, isJlabBuds, DeviceTypeJlabBuds} from './devices/jlabBuds/jlabBudsDevice.js';
 import {GfpsDevice, isGfps, DeviceTypeGfps} from './devices/gfps/gfpsDevice.js';
 
 export const EnhancedDeviceSupportManager = GObject.registerClass({
@@ -170,6 +171,11 @@ export const EnhancedDeviceSupportManager = GObject.registerClass({
                     enabled: this._toggle.soundcoreEnabled,
                     check: isSoundcore,
                     type: DeviceTypeSoundcore,
+                },
+                {
+                    enabled: this._toggle.jlabBudsEnabled ?? true,
+                    check: isJlabBuds,
+                    type: DeviceTypeJlabBuds,
                 },
                 {
                     enabled: this._toggle.gfpsEnabled,
@@ -316,6 +322,11 @@ export const EnhancedDeviceSupportManager = GObject.registerClass({
                 } else if (deviceProps.type === DeviceTypeSoundcore) {
                     deviceProps.enhancedDevice =
                         new SoundcoreDevice(this._settings, path, deviceProps.alias,
+                            this._extPath, this._profileManager,
+                            this.updateDeviceMapCb.bind(this));
+                } else if (deviceProps.type === DeviceTypeJlabBuds) {
+                    deviceProps.enhancedDevice =
+                        new JlabBudsDevice(this._settings, path, deviceProps.alias,
                             this._extPath, this._profileManager,
                             this.updateDeviceMapCb.bind(this));
                 } else if (deviceProps.type === DeviceTypeGfps) {
