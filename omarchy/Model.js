@@ -229,3 +229,11 @@ function opoSettings(family, model, settings, hidden) {
   if (!out.eq && out.switches.length === 0 && !out.bass) return null
   return out
 }
+
+// True when two names differ only in case, spaces or punctuation
+// ("realme Buds Air8" vs "Realme Buds Air 8"). The panel then shows the
+// device name once instead of repeating it as the model name.
+function sameName(a, b) {
+  var norm = function(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "") }
+  return norm(a) !== "" && norm(a) === norm(b)
+}

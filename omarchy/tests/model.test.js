@@ -158,5 +158,12 @@ test('realme settings: other families get nothing', () => {
   assert.equal(M.opoSettings('gfps', air8Model, air8Settings), null)
 })
 
+test('same name: ignores case, spaces and punctuation', () => {
+  assert.equal(M.sameName('realme Buds Air8', 'Realme Buds Air 8'), true)
+  assert.equal(M.sameName('realme Buds Wireless 3', 'Realme Buds Wireless 3'), true)
+  assert.equal(M.sameName("Abhay's buds", 'Realme Buds Air 8'), false)
+  assert.equal(M.sameName('', ''), false)
+})
+
 if (failed) { console.log(`\n${failed} failed`); process.exit(1) }
 console.log('\nall passed')
