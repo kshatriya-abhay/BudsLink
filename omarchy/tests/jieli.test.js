@@ -3,7 +3,8 @@
 //
 //   gjs -m omarchy/tests/jieli.test.js
 import {e1, answerChallenge, makeChallenge, AUTH_PASS} from '../../src/lib/devices/jlabBuds/jieliAuth.js';
-import {encodeFrame, parseStream, parseAttributes, parseEqList, parseEq, Flag, Op, Attr}
+import {encodeFrame, parseStream, parseAttributes, parseEqList, parseEq, Flag, Op, Attr,
+    parseVoiceMode, parseVoiceModes, encodeVoiceMode, encodeAttribute}
     from '../../src/lib/devices/jlabBuds/jieliRcsp.js';
 
 let failures = 0;
@@ -65,6 +66,52 @@ check('EQ list: presets 0..6 with signed gains',
     list.presets.get(6).every(g => g === 0));
 const cur = parseEq(attrs.get(Attr.EQ));
 check('current EQ: preset 0 with its gains', cur.id === 0 && cur.gains[3] === -2);
+
+// ---- noise control ----
+const modes = parseVoiceModes(hex('03 00 4000 4000 4000 4000 01 4000 4000 4000 4000 02 4000 4000 4000 4000'));
+check('voice modes: off, ANC, Be Aware with max 0x4000',
+    modes.map(m => m.mode).join(',') === '0,1,2' && modes.every(m => m.leftMax === 0x4000));
+const half2 = parseVoiceMode(hex('01 4000 4000 200e 200e'));
+check('voice mode: ANC at about half', half2.mode === 1 && half2.leftCur === 0x200e && half2.rightCur === 0x200e);
+check('set voice mode encodes like the app',
+    out(encodeFrame(Flag.COMMAND, Op.SET_SYS_INFO, [0x17, 0xff, ...encodeAttribute(Attr.VOICE_MODE, encodeVoiceMode(half2))])) ===
+    // as captured: fe dc ba c0 08 00 0d | 17 ff 0a 0d 01 4000 4000 200e 200e | ef
+    'fedcbac008000d17ff0a0d0140004000200e200eef');
+
+// ---- device: panel contract and what clicks send (no Bluetooth) ----
+const {JlabBudsDevice} = await import('../../src/lib/devices/jlabBuds/jlabBudsDevice.js');
+const dev = new JlabBudsDevice(null, '/org/bluez/hci0/dev_00_DE_00_00_FF_01', 'JLab JBuds Lux ANC', '',
+    {acquireFd: async () => -1, releaseFd: async () => {}}, () => {});
+const sent = [];
+dev._socket = {setEq: (id, gains) => sent.push(['eq', id, gains.join(',')]), setVoiceMode: vm => sent.push(['vm', vm]), destroy() {}};
+dev._updateVoiceModes(modes);
+dev._updateVoiceMode(half2);
+dev._updateEqList(list);
+dev._updateEq(cur);
+const c = dev.dataHandler.getConfig(), st = dev.dataHandler.getProps();
+check('panel: noise row Off / Noise Cancelling / Be Aware, on ANC',
+    [c.toggle1Button1Name, c.toggle1Button2Name, c.toggle1Button3Name].join('|') === 'Off|Noise Cancelling|Be Aware' &&
+    st.toggle1Visible && st.toggle1State === 2);
+check('panel: level slider (50%) then EQ picker on EQ 1',
+    c.optionsBox1.join(',') === 'slider,radio-button' && c.box1SliderTitle === 'Noise cancelling level' &&
+    st.box1SliderValue === 50 && c.box1RadioButton.join('|') === 'EQ 1|EQ 2|EQ 3|Custom' && st.box1RadioButtonState === 1);
+
+dev.dataHandler.emitUIAction('toggle1State', 3);
+check('click Be Aware: sends mode 2 with Be Aware\'s own stored levels',
+    sent.at(-1)?.[0] === 'vm' && sent.at(-1)[1].mode === 2 && sent.at(-1)[1].leftCur === 0x4000);
+dev.dataHandler.emitUIAction('box1SliderValue', 25);
+check('slider 25%: sends ANC with a quarter of max',
+    sent.at(-1)?.[1].mode === 1 && sent.at(-1)[1].leftCur === 0x1000 && sent.at(-1)[1].rightCur === 0x1000);
+dev.dataHandler.emitUIAction('box1RadioButtonState', 4);
+check('click Custom: sends preset 6 with its stored gains', sent.at(-1)?.join('|') === 'eq|6|0,0,0,0,0,0,0,0,0,0');
+const before = sent.length;
+dev.dataHandler.emitUIAction('toggle1State', 2);
+dev.dataHandler.emitUIAction('box1RadioButtonState', 1);
+check('clicking the current mode or preset sends nothing', sent.length === before);
+dev._updateVoiceMode({...half2, mode: 0});
+const st2 = dev.dataHandler.getProps(), c2 = dev.dataHandler.getConfig();
+check('noise off: no level slider, EQ stays', c2.optionsBox1.join(',') === 'radio-button' && st2.toggle1State === 1);
+dev.destroy();
 
 print(failures ? `\n${failures} failed` : '\nall passed');
 if (failures)
