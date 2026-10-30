@@ -6,8 +6,8 @@ import {createLogger, getDeviceIdentifier} from '../logger.js';
 import {SocketHandler} from '../socketByProfile.js';
 import {AUTH_PASS, answerChallenge, makeChallenge} from './jieliAuth.js';
 import {
-    Attr, Flag, FUNCTION_PUBLIC, Op, encodeAttribute, encodeFrame,
-    parseAttributes, parseEq, parseEqList, parseStream,
+    Attr, Flag, FUNCTION_PUBLIC, Op, encodeAttribute, encodeFrame, encodeVoiceMode,
+    parseAttributes, parseEq, parseEqList, parseStream, parseVoiceMode, parseVoiceModes,
 } from './jieliRcsp.js';
 
 const REPLY_TIMEOUT_MS = 1500;
@@ -16,8 +16,8 @@ const AUTH_TIMEOUT_MS = 4000;
 const hexBytes = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join(' ');
 
 // Jieli RCSP over SPP. On connect: authenticate (both directions), then read
-// the EQ. Nothing is written to the device except the handshake and what the
-// user asks for (setEq).
+// the EQ and noise control. Nothing is written to the device except the
+// handshake and what the user asks for (setEq, setVoiceMode).
 export const JlabBudsSocket = GObject.registerClass({
     GTypeName: 'BudsLink_JlabBudsSocket',
 }, class JlabBudsSocket extends SocketHandler {
@@ -75,6 +75,7 @@ export const JlabBudsSocket = GObject.registerClass({
     _onAuthenticated() {
         // Read-only queries.
         this._getSysInfo(1 << Attr.EQ | 1 << Attr.EQ_LIST);
+        this._getSysInfo(1 << Attr.VOICE_MODE | 1 << Attr.VOICE_MODES);
     }
 
     // ---- commands ----
@@ -127,6 +128,12 @@ export const JlabBudsSocket = GObject.registerClass({
             `set EQ ${id}`);
     }
 
+    setVoiceMode(vm) {
+        this._queueCommand(Op.SET_SYS_INFO,
+            [FUNCTION_PUBLIC, ...encodeAttribute(Attr.VOICE_MODE, encodeVoiceMode(vm))],
+            `set noise mode ${vm.mode} (${vm.leftCur}/${vm.leftMax})`);
+    }
+
     // ---- incoming ----
 
     processData(bytes) {
@@ -166,6 +173,13 @@ export const JlabBudsSocket = GObject.registerClass({
             this._callbacks.updateEqList?.(parseEqList(attrs.get(Attr.EQ_LIST)));
         if (attrs.has(Attr.EQ))
             this._callbacks.updateEq?.(parseEq(attrs.get(Attr.EQ)));
+        if (attrs.has(Attr.VOICE_MODES))
+            this._callbacks.updateVoiceModes?.(parseVoiceModes(attrs.get(Attr.VOICE_MODES)));
+        if (attrs.has(Attr.VOICE_MODE)) {
+            const vm = parseVoiceMode(attrs.get(Attr.VOICE_MODE));
+            if (vm)
+                this._callbacks.updateVoiceMode?.(vm);
+        }
     }
 
     destroy() {

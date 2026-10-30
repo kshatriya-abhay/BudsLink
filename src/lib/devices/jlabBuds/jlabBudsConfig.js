@@ -14,6 +14,12 @@ export const JlabBudsModelList = [
         pattern: /^JLab JBuds Lux ANC/i,
         batteryType: 1,
         icon: 'headphone1',
+        // Noise modes, as the JLab app names them.
+        noiseModes: [
+            {mode: 0, label: 'Off'},
+            {mode: 1, label: 'Noise Cancelling', levelTitle: 'Noise cancelling level'},
+            {mode: 2, label: 'Be Aware', levelTitle: 'Be Aware level'},
+        ],
         // The presets the JLab app offers (the device stores more, 0..6).
         eqPresets: [
             {id: 0x00, label: 'EQ 1'},
