@@ -117,3 +117,33 @@ export function parseEqList(data) {
 export function parseEq(data) {
     return {id: data[0], gains: Array.from(data.slice(1), i8)};
 }
+
+// Noise mode (attribute 0x0D, and each entry of 0x0E): mode, then left max,
+// right max, left current, right current, each u16 big-endian. Modes: 0 off,
+// 1 noise cancelling, 2 transparency ("Be Aware" on JLab).
+export const VoiceMode = {OFF: 0, ANC: 1, TRANSPARENT: 2};
+
+const u16 = (d, i) => d[i] << 8 | d[i + 1];
+
+export function parseVoiceMode(data) {
+    if (!data || data.length < 9)
+        return null;
+    return {
+        mode: data[0],
+        leftMax: u16(data, 1), rightMax: u16(data, 3),
+        leftCur: u16(data, 5), rightCur: u16(data, 7),
+    };
+}
+
+// The modes the device has (attribute 0x0E): count, then 9 bytes per mode.
+export function parseVoiceModes(data) {
+    const modes = [];
+    for (let i = 0, pos = 1; i < (data?.[0] ?? 0) && pos + 9 <= data.length; i++, pos += 9)
+        modes.push(parseVoiceMode(data.slice(pos, pos + 9)));
+    return modes;
+}
+
+export function encodeVoiceMode(vm) {
+    const be = v => [v >> 8 & 0xFF, v & 0xFF];
+    return [vm.mode, ...be(vm.leftMax), ...be(vm.rightMax), ...be(vm.leftCur), ...be(vm.rightCur)];
+}
