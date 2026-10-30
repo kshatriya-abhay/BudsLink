@@ -12,6 +12,9 @@ import {
 
 const REPLY_TIMEOUT_MS = 1500;
 const AUTH_TIMEOUT_MS = 4000;
+// The headphones sometimes drop a command sent right after authentication.
+const SETTLE_AFTER_AUTH_MS = 300;
+const MAX_TRIES = 3;
 
 const hexBytes = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join(' ');
 
@@ -73,9 +76,11 @@ export const JlabBudsSocket = GObject.registerClass({
     }
 
     _onAuthenticated() {
-        // Read-only queries.
-        this._getSysInfo(1 << Attr.EQ | 1 << Attr.EQ_LIST);
-        this._getSysInfo(1 << Attr.VOICE_MODE | 1 << Attr.VOICE_MODES);
+        // Read-only queries, after a short pause.
+        this._after(SETTLE_AFTER_AUTH_MS, () => {
+            this._getSysInfo(1 << Attr.EQ | 1 << Attr.EQ_LIST);
+            this._getSysInfo(1 << Attr.VOICE_MODE | 1 << Attr.VOICE_MODES);
+        });
     }
 
     // ---- commands ----
@@ -97,7 +102,7 @@ export const JlabBudsSocket = GObject.registerClass({
 
     // One command in flight at a time; the reply carries its sequence byte.
     _queueCommand(opcode, body, label) {
-        this._queue.push({opcode, body, label});
+        this._queue.push({opcode, body, label, tries: 0});
         this._pump();
     }
 
@@ -105,13 +110,19 @@ export const JlabBudsSocket = GObject.registerClass({
         if (this._pending || this._queue.length === 0 || this._auth !== 'done')
             return;
         const item = this._queue.shift();
+        item.tries++;
         const seq = this._nextSeq();
         this._pending = {seq, opcode: item.opcode};
         this._log.info(`Send ${item.label}`);
         this.sendMessage(encodeFrame(Flag.COMMAND, item.opcode, [seq, ...item.body]));
         this._pending.timeout = this._after(REPLY_TIMEOUT_MS, () => {
-            this._log.info(`No reply to ${item.label}`);
             this._pending = null;
+            if (item.tries < MAX_TRIES) {
+                this._log.info(`No reply to ${item.label}; retrying`);
+                this._queue.unshift(item);
+            } else {
+                this._log.info(`No reply to ${item.label}; giving up`);
+            }
             this._pump();
         });
     }
