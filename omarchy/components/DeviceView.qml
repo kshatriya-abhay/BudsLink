@@ -30,9 +30,16 @@ Column {
     ? [Model.toggleRow(config, state, 1), Model.toggleRow(config, state, 2)].filter(function(r) { return !!r })
     : []
   readonly property var box: ready ? Model.optionsBox(config, state) : null
+  // Realme/Oppo/OnePlus: EQ presets, feature switches, bass level.
+  readonly property var opo: ready && info ? Model.opoSettings(device.family, info.model, info.settings) : null
 
   function uiAction(action, value) {
     if (service && device) service.uiAction(device.path, action, value)
+  }
+
+  // Change one settings key; upstream's device code sends the command.
+  function setSetting(key, value) {
+    if (service && device) service.setSetting(device.path, key, value)
   }
 
   // ---- keyboard navigation ----
@@ -58,6 +65,14 @@ Column {
           rows.push({ key: "box" + box.n + "SliderValue", type: "slider", value: box.slider.value })
       }
     }
+    if (opo) {
+      if (opo.eq)
+        rows.push({ key: "set:eq-preset", type: "choice", options: opo.eq.options, value: opo.eq.value })
+      for (var s = 0; s < opo.switches.length; s++)
+        rows.push({ key: "set:" + opo.switches[s].key, type: "switch", checked: opo.switches[s].checked })
+      if (opo.bass)
+        rows.push({ key: "set:bass-level", type: "slider", value: opo.bass.value, min: opo.bass.min, max: opo.bass.max })
+    }
     return rows
   }
   property int cursor: -1        // index into focusRows, -1 = no cursor here
@@ -82,6 +97,8 @@ Column {
     if (!row) return
     if (row.type === "choice")
       chip = Math.max(0, Math.min(row.options.length - 1, chip + dx))
+    else if (row.type === "slider" && row.key.indexOf("set:") === 0)
+      setSetting(row.key.slice(4), Math.max(row.min, Math.min(row.max, Math.round(row.value) + dx)))
     else if (row.type === "slider")
       uiAction(row.key, Math.max(0, Math.min(100, Math.round(row.value) + dx * 5)))
   }
@@ -92,6 +109,14 @@ Column {
     if (!row) return
     if (row.key === "controls") {
       if (service && device) service.setControls(device.path, !controls)
+    } else if (row.key.indexOf("set:") === 0) {
+      var key = row.key.slice(4)
+      if (row.type === "choice") {
+        var picked = row.options[chip]
+        if (picked && picked.value !== row.value) setSetting(key, Number(picked.value))
+      } else if (row.type === "switch") {
+        setSetting(key, !row.checked)
+      }
     } else if (row.type === "choice") {
       var option = row.options[chip]
       if (option && option.value !== row.value) uiAction(row.key, Number(option.value))
@@ -373,6 +398,103 @@ Column {
             border.color: view.foreground
           }
         }
+      }
+    }
+  }
+
+  // ---------- Realme / Oppo / OnePlus settings ----------
+  Column {
+    width: parent.width
+    spacing: Style.space(8)
+    visible: !!view.opo
+    enabled: view.controls
+    opacity: enabled ? 1.0 : 0.5
+
+    PanelSeparator { width: parent.width; foreground: view.foreground }
+
+    PanelSectionHeader {
+      width: parent.width
+      visible: !!view.opo && !!view.opo.eq
+      text: "Equalizer"
+      foreground: view.foreground
+      fontFamily: view.fontFamily
+    }
+    ChoiceGroup {
+      width: parent.width
+      visible: !!view.opo && !!view.opo.eq
+      options: view.opo && view.opo.eq ? view.opo.eq.options : []
+      value: view.opo && view.opo.eq ? view.opo.eq.value : ""
+      cursorIndex: view.cursorKey === "set:eq-preset" ? view.chip : -1
+      foreground: view.foreground
+      fontFamily: view.fontFamily
+      onChanged: function(value) { view.setSetting("eq-preset", Number(value)) }
+    }
+
+    PanelSectionHeader {
+      width: parent.width
+      visible: !!view.opo && view.opo.switches.length > 0
+      text: "Features"
+      foreground: view.foreground
+      fontFamily: view.fontFamily
+    }
+    Repeater {
+      model: view.opo ? view.opo.switches : []
+
+      Item {
+        required property var modelData
+        width: view.width
+        height: Math.max(featureLabel.implicitHeight, featureSwitch.implicitHeight)
+        Text {
+          id: featureLabel
+          anchors.left: parent.left
+          anchors.right: featureSwitch.left
+          anchors.rightMargin: Style.space(8)
+          anchors.verticalCenter: parent.verticalCenter
+          text: modelData.label
+          color: view.foreground
+          font.family: view.fontFamily
+          font.pixelSize: Style.font.body
+          wrapMode: Text.WordWrap
+        }
+        ToggleSwitch {
+          id: featureSwitch
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          checked: modelData.checked
+          hasCursor: view.cursorKey === "set:" + modelData.key
+          foreground: view.foreground
+          onToggled: view.setSetting(modelData.key, !modelData.checked)
+        }
+      }
+    }
+
+    PanelSectionHeader {
+      width: parent.width
+      visible: !!view.opo && !!view.opo.bass
+      text: "Bass level" + (view.opo && view.opo.bass ? "  ·  " + (view.opo.bass.value > 0 ? "+" : "") + view.opo.bass.value : "")
+      foreground: view.foreground
+      fontFamily: view.fontFamily
+    }
+    PanelSlider {
+      width: parent.width
+      visible: !!view.opo && !!view.opo.bass
+      bar: view.bar
+      minimum: -5
+      maximum: 5
+      step: 1
+      integer: true
+      tickCount: 11
+      value: view.opo && view.opo.bass ? view.opo.bass.value : 0
+      onReleased: function(value) { view.setSetting("bass-level", Math.round(value)) }
+
+      Rectangle {
+        anchors.fill: parent
+        anchors.margins: -Style.space(4)
+        visible: view.cursorKey === "set:bass-level"
+        color: "transparent"
+        radius: Style.space(4)
+        border.width: 1
+        border.color: view.foreground
       }
     }
   }

@@ -114,5 +114,39 @@ test('options box: none', () => {
   assert.equal(M.optionsBox(config, { ...state, optionsBoxVisible: 0 }), null)
 })
 
+// ---- Realme settings ----
+const air8Model = { eqPreset: { originalSound: 0, deepBass: 1, serenade: 2, clearBass: 3 },
+  lowLatencyMode: true, spatialAudio: true, inEarDetection: true, dualConnection: true,
+  autoAnswer: true, windNoiseReduction: true, highResAudio: true, findMyPhone: true }
+const air8Settings = { 'eq-preset': 4, 'custom-eq-list': [{ eqId: 4, name: 'Flat' }], lowlatency: false,
+  spatial: true, 'inear-enable': true, 'dual-connection': true, 'auto-answer': false,
+  'wind-noise': true, 'high-res': false, 'find-phone': false }
+test('realme settings: presets with app names plus custom EQ', () => {
+  const r = M.opoSettings('opoBuds', air8Model, air8Settings)
+  assert.deepEqual(plain(r.eq.options.map(o => o.label)), ['Original sound', 'Deep bass', 'Serenade', 'Clear bass', 'Flat'])
+  assert.equal(r.eq.value, '4')
+})
+test('realme settings: switches in order, no wind/high-res/find-phone', () => {
+  const r = M.opoSettings('opoBuds', air8Model, air8Settings)
+  assert.deepEqual(plain(r.switches.map(s => [s.key, s.checked])),
+    [['lowlatency', false], ['spatial', true], ['inear-enable', true], ['auto-answer', false], ['dual-connection', true]])
+  assert.equal(r.bass, null)
+})
+test('realme settings: bass level only for bass-engine models with dynamic bass on', () => {
+  const w3 = { eqPreset: { originalSound: 0 }, dynamicBass: true, dynamicBassOpo: true, lowLatencyMode: true }
+  const on = M.opoSettings('opoBuds', w3, { 'eq-preset': 0, 'dynamic-bass': true, 'bass-level': -3, lowlatency: false })
+  assert.deepEqual(plain(on.bass), { value: -3, min: -5, max: 5 })
+  const off = M.opoSettings('opoBuds', w3, { 'eq-preset': 0, 'dynamic-bass': false, 'bass-level': -3 })
+  assert.equal(off.bass, null)
+  assert.equal(M.opoSettings('opoBuds', { dynamicBass: true }, { 'dynamic-bass': true, 'bass-level': 2 }).bass, null)
+})
+test('realme settings: keys missing from settings are not offered', () => {
+  const r = M.opoSettings('opoBuds', air8Model, { 'eq-preset': 0 })
+  assert.equal(r.switches.length, 0)
+})
+test('realme settings: other families get nothing', () => {
+  assert.equal(M.opoSettings('gfps', air8Model, air8Settings), null)
+})
+
 if (failed) { console.log(`\n${failed} failed`); process.exit(1) }
 console.log('\nall passed')

@@ -161,3 +161,66 @@ function optionsBox(config, state) {
   if (!box.radio && !box.slider && box.checks.length === 0) return null
   return box
 }
+
+// ---- Realme / Oppo / OnePlus settings (family "opoBuds") ----
+// Built from the matched model config (what the hardware has) and the
+// device's settings item (current values). Changes go out as a `set` of one
+// settings key, which upstream's device code turns into the command.
+
+// Preset names as the realme Link app shows them.
+var OPO_EQ_LABELS = {
+  originalSound: "Original sound", deepBass: "Deep bass", serenade: "Serenade",
+  clearBass: "Clear bass", bass: "Bass"
+}
+
+// Switches, in display order: model flag -> settings key. Wind noise lives
+// in the generic options box already; High-res (LHDC) is left out on
+// purpose (it can silence the control channel, upstream #95); find-phone
+// rings the phone and means nothing on a laptop.
+var OPO_SWITCHES = [
+  { flag: "lowLatencyMode", key: "lowlatency", label: "Game mode" },
+  { flag: "spatialAudio", key: "spatial", label: "Spatial audio" },
+  { flag: "inEarDetection", key: "inear-enable", label: "In-ear detection" },
+  { flag: "autoAnswer", key: "auto-answer", label: "Auto-answer calls" },
+  { flag: "dualConnection", key: "dual-connection", label: "Dual connection" },
+  { flag: "dynamicBass", key: "dynamic-bass", label: "Dynamic bass" }
+]
+
+function words(key) {
+  var s = String(key).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+// Returns null when there is nothing to show, else
+// { eq: {options, value} | null, switches: [{key, label, checked}],
+//   bass: {value, min, max} | null }
+function opoSettings(family, model, settings) {
+  if (family !== "opoBuds" || !model || !settings) return null
+  var out = { eq: null, switches: [], bass: null }
+
+  if (model.eqPreset && settings["eq-preset"] !== undefined) {
+    var options = []
+    for (var key in model.eqPreset)
+      options.push({ value: String(model.eqPreset[key]), label: OPO_EQ_LABELS[key] || words(key) })
+    // Custom profiles saved on the buds (e.g. "Flat" on the Air 8).
+    var customs = settings["custom-eq-list"] || []
+    for (var c = 0; c < customs.length; c++)
+      if (customs[c] && customs[c].eqId !== undefined)
+        options.push({ value: String(customs[c].eqId), label: String(customs[c].name || ("Custom " + customs[c].eqId)) })
+    out.eq = { options: options, value: String(settings["eq-preset"]) }
+  }
+
+  for (var i = 0; i < OPO_SWITCHES.length; i++) {
+    var sw = OPO_SWITCHES[i]
+    if (model[sw.flag] && settings[sw.key] !== undefined)
+      out.switches.push({ key: sw.key, label: sw.label, checked: settings[sw.key] === true })
+  }
+
+  // Bass level (-5..+5) exists only on models using the bass engine
+  // commands, and only means something while dynamic bass is on.
+  if (model.dynamicBass && model.dynamicBassOpo && settings["bass-level"] !== undefined && settings["dynamic-bass"] === true)
+    out.bass = { value: Number(settings["bass-level"]) || 0, min: -5, max: 5 }
+
+  if (!out.eq && out.switches.length === 0 && !out.bass) return null
+  return out
+}
