@@ -12,7 +12,7 @@ import {EnhancedDeviceSupportManager} from '../../src/lib/enhancedDeviceSupportM
 const FAMILIES = [
     'airpods', 'sony', 'galaxyBuds', 'nothingBuds', 'googleBuds', 'redmiBuds',
     'senhBuds', 'boseBuds', 'edifierBuds', 'opoBuds', 'cambridgeBuds',
-    'soundcore', 'gfps',
+    'soundcore', 'jlabBuds', 'gfps',
 ];
 
 export const Host = GObject.registerClass({

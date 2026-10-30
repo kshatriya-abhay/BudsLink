@@ -30,6 +30,8 @@ import {GalaxyBudsModelList, GalaxyBudsModel, BudsLegacyUUID, DeviceIdPrefixUUID
     from '../../src/lib/devices/galaxyBuds/galaxyBudsConfig.js';
 import {checkForSamsungBuds} from '../../src/lib/devices/galaxyBuds/galaxyBudsDetector.js';
 import {GfpsDevice, DeviceTypeGfps} from '../../src/lib/devices/gfps/gfpsDevice.js';
+import {JlabBudsDevice, DeviceTypeJlabBuds} from '../../src/lib/devices/jlabBuds/jlabBudsDevice.js';
+import {JlabBudsModelList} from '../../src/lib/devices/jlabBuds/jlabBudsConfig.js';
 import {GoogleBudsDevice, DeviceTypeGoogleBuds} from '../../src/lib/devices/googleBuds/googleBudsDevice.js';
 import {NothingBudsDevice, DeviceTypeNothingBuds} from '../../src/lib/devices/nothingBuds/nothingBudsDevice.js';
 import {NothingBudsModelList} from '../../src/lib/devices/nothingBuds/nothingBudsConfig.js';
@@ -73,6 +75,8 @@ function cutOffBluetooth() {
     const realGetCached = Gio.DBusProxy.prototype.get_cached_property;
     Gio.DBusProxy.prototype.get_cached_property = function (name) {
         const props = fakeBluez.get(this.g_object_path);
+        if (props && this.g_interface_name === 'org.bluez.Battery1')
+            return name === 'Percentage' ? new GLib.Variant('y', 80) : null;
         if (props && this.g_interface_name === 'org.bluez.Device1') {
             const type = BLUEZ_TYPES[name];
             return type && props[name] !== undefined ? new GLib.Variant(type, props[name]) : null;
@@ -139,6 +143,8 @@ const RECIPES = [
         bluez: m => ({Name: nameFromPattern(m.namePattern, m.name ?? '')})},
     {type: DeviceTypeGalaxyBuds, Device: GalaxyBudsDevice, models: GalaxyBudsModelList,
         bluez: galaxyBluez},
+    {type: DeviceTypeJlabBuds, Device: JlabBudsDevice, models: JlabBudsModelList,
+        bluez: m => ({Modalias: 'bluetooth:v05D6p000Ad0240', Name: m.name})},
     {type: DeviceTypeGoogleBuds, Device: GoogleBudsDevice, models: [{name: 'Pixel Buds'}]},
     {type: DeviceTypeGfps, Device: GfpsDevice, models: [{name: 'Google Fast Pair (generic)'}],
         init: d => d.updateInitDevice(3),
