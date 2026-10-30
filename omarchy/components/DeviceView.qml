@@ -15,6 +15,7 @@ Column {
   property QtObject bar: null
   property bool showTitle: true
   property int lowBattery: 15
+  property var hiddenFeatures: []    // settings keys to leave out (plugin setting)
   property color foreground: Color.foreground
   property color urgent: Color.urgent
   property color dim: Qt.darker(foreground, 1.55)
@@ -31,7 +32,7 @@ Column {
     : []
   readonly property var box: ready ? Model.optionsBox(config, state) : null
   // Realme/Oppo/OnePlus: EQ presets, feature switches, bass level.
-  readonly property var opo: ready && info ? Model.opoSettings(device.family, info.model, info.settings) : null
+  readonly property var opo: ready && info ? Model.opoSettings(device.family, info.model, info.settings, hiddenFeatures) : null
 
   function uiAction(action, value) {
     if (service && device) service.uiAction(device.path, action, value)

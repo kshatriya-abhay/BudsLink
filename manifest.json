@@ -7,7 +7,10 @@
   "license": "GPL-3.0-or-later",
   "repository": "https://github.com/kshatriya-abhay/BudsLink",
   "description": "Battery, noise control and settings for Bluetooth earbuds in the Omarchy bar, powered by BudsLink's device support (AirPods, Galaxy Buds, Sony, Nothing, Pixel Buds, Redmi, Realme/Oppo/OnePlus, Bose, Sennheiser, Soundcore and more).",
-  "kinds": ["service", "bar-widget"],
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
   "keepLoaded": true,
   "entryPoints": {
     "service": "omarchy/Service.qml",
@@ -17,13 +20,26 @@
     "displayName": "Buds",
     "description": "Battery and noise control for connected earbuds, with a dropdown when several are connected.",
     "category": "Audio",
-    "aliases": ["earbuds", "headphones", "anc", "budslink", "realme", "jlab", "airpods", "galaxy buds"],
+    "aliases": [
+      "earbuds",
+      "headphones",
+      "anc",
+      "budslink",
+      "realme",
+      "jlab",
+      "airpods",
+      "galaxy buds"
+    ],
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
       "showPercent": true,
       "hideWhenDisconnected": true,
-      "lowBattery": 15
+      "lowBattery": 15,
+      "hiddenFeatures": [
+        "auto-answer",
+        "dual-connection"
+      ]
     },
     "schema": [
       {
@@ -48,6 +64,48 @@
         "step": 5,
         "defaultValue": 15,
         "description": "The icon turns urgent at or below this level."
+      },
+      {
+        "key": "hiddenFeatures",
+        "type": "multiselect",
+        "label": "Hidden features",
+        "description": "Feature switches to leave out of the panel, for every device. They stay as they are on the earbuds; the panel just doesn't offer them.",
+        "noSelectionText": "Show all features",
+        "placeholderText": "Search features...",
+        "emptyText": "No features",
+        "defaultValue": [
+          "auto-answer",
+          "dual-connection"
+        ],
+        "options": [
+          {
+            "value": "lowlatency",
+            "label": "Game mode",
+            "description": "Low latency mode"
+          },
+          {
+            "value": "spatial",
+            "label": "Spatial audio"
+          },
+          {
+            "value": "inear-enable",
+            "label": "In-ear detection",
+            "description": "Pause when an earbud comes out"
+          },
+          {
+            "value": "auto-answer",
+            "label": "Auto-answer calls"
+          },
+          {
+            "value": "dual-connection",
+            "label": "Dual connection",
+            "description": "Connect to two devices at once"
+          },
+          {
+            "value": "dynamic-bass",
+            "label": "Dynamic bass"
+          }
+        ]
       }
     ]
   }

@@ -140,6 +140,16 @@ test('realme settings: bass level only for bass-engine models with dynamic bass 
   assert.equal(off.bass, null)
   assert.equal(M.opoSettings('opoBuds', { dynamicBass: true }, { 'dynamic-bass': true, 'bass-level': 2 }).bass, null)
 })
+test('realme settings: hidden features are left out', () => {
+  const r = M.opoSettings('opoBuds', air8Model, air8Settings, ['auto-answer', 'dual-connection'])
+  assert.deepEqual(plain(r.switches.map(s => s.key)), ['lowlatency', 'spatial', 'inear-enable'])
+})
+test('realme settings: hiding dynamic bass also hides the bass level', () => {
+  const w3 = { dynamicBass: true, dynamicBassOpo: true, lowLatencyMode: true }
+  const r = M.opoSettings('opoBuds', w3, { 'dynamic-bass': true, 'bass-level': 1, lowlatency: true }, ['dynamic-bass'])
+  assert.deepEqual(plain(r.switches.map(s => s.key)), ['lowlatency'])
+  assert.equal(r.bass, null)
+})
 test('realme settings: keys missing from settings are not offered', () => {
   const r = M.opoSettings('opoBuds', air8Model, { 'eq-preset': 0 })
   assert.equal(r.switches.length, 0)
