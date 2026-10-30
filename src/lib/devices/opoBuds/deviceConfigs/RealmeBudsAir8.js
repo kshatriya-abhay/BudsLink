@@ -60,7 +60,6 @@ export default {
     volumeEnhancer: false,
     spatialAudio: true,
     highResAudio: true,
-    dynamicBass: true,
     autoAnswer: true,
     findMyPhone: true,
     fitTest: true,
