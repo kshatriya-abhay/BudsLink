@@ -145,4 +145,6 @@ All device support comes from [BudsLink](https://github.com/maniacx/BudsLink) by
 additions were mapped from the vendors' Android apps with Bluetooth captures. Not affiliated with
 any earbud maker, BudsLink or Omarchy.
 
-GPL-3.0-or-later, like BudsLink.
+GPL-3.0-or-later, like BudsLink: see [LICENSE](../LICENSE). The repository also carries BudsLink's
+bundled copy of libgnome-volume-control (`subprojects/gvc`, GPL-2.0-or-later), which only BudsLink's
+Flatpak build uses; the plugin doesn't load it.
