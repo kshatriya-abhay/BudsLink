@@ -38,7 +38,7 @@ const wait = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT
     return GLib.SOURCE_REMOVE;
 }));
 
-const PATH = '/org/bluez/hci0/dev_60_55_56_C4_1D_5E';
+const PATH = '/org/bluez/hci0/dev_00_00_00_00_00_A8';
 const settings = memorySettings();
 settings.set_strv('opo-buds-list', [JSON.stringify({
     path: PATH, modelid: '064812', alias: 'Test buds', 'eq-preset': 0, 'inear-enable': true,
@@ -54,7 +54,7 @@ const bridge = new Bridge({settings, stateDir: tmp, emit: e => events.push(e)});
 const of = t => events.filter(e => e.t === t);
 
 const device = {
-    path: PATH, address: '60:55:56:C4:1D:5E', alias: 'Test buds', connected: true,
+    path: PATH, address: '00:00:00:00:00:A8', alias: 'Test buds', connected: true,
     family: 'opoBuds', pending: false, dataHandler: handler,
 };
 
@@ -102,7 +102,7 @@ const main = async () => {
         of('error').slice(-2).every(e => e.code === 'controls-disabled'));
 
     const reloaded = new Bridge({settings, stateDir: tmp, emit: () => {}});
-    check('controls setting persists', reloaded.controlsEnabled('60:55:56:C4:1D:5E') === false);
+    check('controls setting persists', reloaded.controlsEnabled('00:00:00:00:00:A8') === false);
     reloaded.destroy();
 
     bridge.updateDevices([{...device, connected: false, dataHandler: null}]);

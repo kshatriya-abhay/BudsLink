@@ -18,20 +18,20 @@ function test(name, fn) {
   try { fn(); console.log('ok   ' + name) } catch (e) { failed++; console.log('FAIL ' + name + '\n     ' + e.message) }
 }
 
-const air8 = { path: '/p/air8', address: '60:55:56:C4:1D:5E', connected: true, family: 'opoBuds' }
-const w5 = { path: '/p/w5', address: '84:9D:4B:3E:3B:5C', connected: true, family: 'opoBuds' }
-const speaker = { path: '/p/spk', address: '24:CF:24:10:1B:42', connected: true, family: null }
-const jlab = { path: '/p/jlab', address: '90:DA:07:9F:94:DE', connected: false, family: 'gfps' }
+const air8 = { path: '/p/air8', address: '00:00:00:00:00:A8', connected: true, family: 'opoBuds' }
+const w5 = { path: '/p/w5', address: '00:00:00:00:00:B5', connected: true, family: 'opoBuds' }
+const speaker = { path: '/p/spk', address: '00:00:00:00:00:5C', connected: true, family: null }
+const jlab = { path: '/p/jlab', address: '00:00:00:00:00:1B', connected: false, family: 'gfps' }
 
 test('selectable = connected and supported', () => {
   assert.deepEqual(plain(M.selectableDevices([air8, speaker, jlab, w5]).map(d => d.path)), ['/p/air8', '/p/w5'])
 })
 
 test('pick: manual choice wins while connected', () => {
-  assert.equal(M.pickDevice([air8, w5], '/p/w5', '60:55:56:C4:1D:5E'), '/p/w5')
+  assert.equal(M.pickDevice([air8, w5], '/p/w5', '00:00:00:00:00:A8'), '/p/w5')
 })
 test('pick: audio output when no manual choice', () => {
-  assert.equal(M.pickDevice([air8, w5], '', '84:9d:4b:3e:3b:5c'), '/p/w5')
+  assert.equal(M.pickDevice([air8, w5], '', '00:00:00:00:00:B5'), '/p/w5')
 })
 test('pick: stale manual choice falls back', () => {
   assert.equal(M.pickDevice([air8], '/p/w5', ''), '/p/air8')
@@ -41,8 +41,8 @@ test('pick: nothing selectable', () => {
 })
 
 test('wpctl address parse', () => {
-  const text = '  * api.bluez5.address = "60:55:56:c4:1d:5e"\n  * api.bluez5.codec = "aac"'
-  assert.equal(M.audioAddressFromWpctl(text), '60:55:56:C4:1D:5E')
+  const text = '  * api.bluez5.address = "00:00:00:00:00:A8"\n  * api.bluez5.codec = "aac"'
+  assert.equal(M.audioAddressFromWpctl(text), '00:00:00:00:00:A8')
   assert.equal(M.audioAddressFromWpctl('alsa sink'), '')
 })
 
