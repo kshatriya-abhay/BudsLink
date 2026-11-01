@@ -167,6 +167,7 @@ Panel {
           spacing: Style.space(12)
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             visible: !!root.service && root.service.demo
             text: "Demo mode: every model BudsLink knows, with fake data. Nothing is sent to any device. Turn off with: omarchy-shell kshatriya-abhay.buds demo off"
@@ -204,6 +205,7 @@ Panel {
                 onClicked: root.turnPage(1)
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.service
                   ? "Page " + (root.service.galleryPage + 1) + " of " + root.service.galleryPages
@@ -305,6 +307,7 @@ Panel {
 
           // ---------- Empty and error states ----------
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             visible: !root.running
             text: "The Omarchy Buds backend is not running. It needs /usr/bin/gjs (package gjs)."
@@ -315,6 +318,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             visible: root.running && root.selectable.length === 0
             text: "No supported earbuds connected."
@@ -325,6 +329,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             visible: !!root.service && !!root.service.lastError && root.service.lastError.code === "profile-conflict"
             text: "Another app (for example the BudsLink Flatpak) is using this earbud's control channel. Close it, then restart the shell."

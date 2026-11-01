@@ -130,6 +130,7 @@ Column {
 
   // ---------- Title ----------
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     visible: view.showTitle && !!view.device
     text: view.device ? view.device.alias : ""
@@ -145,6 +146,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     // The model name only when it says more than the device name.
     visible: !!view.device && !!view.device.model && !Model.sameName(view.device.model, view.device.alias)
@@ -167,12 +169,14 @@ Column {
       anchors.right: controlsSwitch.left
       anchors.verticalCenter: parent.verticalCenter
       Text {
+        textFormat: Text.PlainText
         text: "Controls"
         color: view.foreground
         font.family: view.fontFamily
         font.pixelSize: Style.font.body
       }
       Text {
+        textFormat: Text.PlainText
         visible: !view.controls
         width: parent.width
         text: "Read-only: nothing is sent to these earbuds"
@@ -227,6 +231,7 @@ Column {
         opacity: modelData.disconnected ? 0.5 : 1.0
 
         Text {
+          textFormat: Text.PlainText
           id: cellLabel
           text: modelData.label
           color: view.dim
@@ -258,6 +263,7 @@ Column {
         }
 
         Text {
+          textFormat: Text.PlainText
           id: cellValue
           text: modelData.disconnected ? "–" : (modelData.charging ? "󰂄 " : "") + modelData.level + "%"
           color: view.foreground
@@ -347,6 +353,7 @@ Column {
             width: view.width
             height: Math.max(checkLabel.implicitHeight, checkSwitch.implicitHeight)
             Text {
+              textFormat: Text.PlainText
               id: checkLabel
               anchors.left: parent.left
               anchors.right: checkSwitch.left
@@ -447,6 +454,7 @@ Column {
         width: view.width
         height: Math.max(featureLabel.implicitHeight, featureSwitch.implicitHeight)
         Text {
+          textFormat: Text.PlainText
           id: featureLabel
           anchors.left: parent.left
           anchors.right: featureSwitch.left
@@ -502,6 +510,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     visible: !!view.device && !view.ready
     text: "Waiting for the earbuds… If this stays, this model isn't supported yet."

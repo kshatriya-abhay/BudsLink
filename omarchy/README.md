@@ -112,6 +112,7 @@ o.bind("SUPER + CTRL + A", "Cycle noise control", "omarchy-shell kshatriya-abhay
 omarchy/dev/sync.sh                   # copy this checkout into ~/.config/omarchy/plugins
 omarchy restart shell                 # pick up changes to Service.qml
 node omarchy/tests/model.test.js      # panel logic
+node omarchy/tests/qml.test.js        # every Text renders plain text
 gjs -m omarchy/tests/bridge.test.js   # backend ↔ shell bridge
 gjs -m omarchy/tests/demo.test.js     # every model's panel, Bluetooth cut off
 omarchy/dev/gallery-snapshots.sh      # render every demo page to PNGs (demo mode on)
