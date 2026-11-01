@@ -11,6 +11,7 @@ set -euo pipefail
 
 id=kshatriya-abhay.buds
 out="${1:-$HOME/.local/state/omarchy-buds/snapshots}"
+umask 077
 mkdir -p "$out"
 rm -f "$out"/page-*.png
 

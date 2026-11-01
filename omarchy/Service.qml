@@ -160,7 +160,7 @@ QtObject {
 
   function setDemo(on) {
     demoSwitch.command = on
-      ? ["sh", "-c", "mkdir -p \"$1\" && touch \"$1/demo\"", "sh", stateDir]
+      ? ["sh", "-c", "umask 077 && mkdir -p \"$1\" && touch \"$1/demo\"", "sh", stateDir]
       : ["rm", "-f", stateDir + "/demo"]
     demoSwitch.running = true
   }

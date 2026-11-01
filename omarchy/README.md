@@ -64,7 +64,7 @@ The earbuds keep whatever settings they had.
 - **Commands it runs**: `gjs`, `glib-compile-schemas` (at startup, into its state folder) and
   `wpctl inspect` (to find the current audio output).
 - **Files**: only `~/.local/state/omarchy-buds/` (settings, a per-device Controls file, an
-  optional log, snapshots).
+  optional log, snapshots), readable only by you.
 - **Network**: none. **Privileges**: none beyond your user. **Keybindings**: none added.
 - **One program per earbud control channel**: close the BudsLink Flatpak and other earbud plugins
   (Galaxy Buds, Nothing, Omipods and so on) for the same device, or one of them will lose the

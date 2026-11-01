@@ -4,4 +4,9 @@
 set -euo pipefail
 here="$(dirname "$(readlink -f "$0")")"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy-buds"
+# The folder holds device names and addresses and the runtime log: keep it
+# private to this user, including files from older versions.
+umask 077
+mkdir -p "$XDG_STATE_HOME"
+chmod -R go-rwx "$XDG_STATE_HOME"
 exec /usr/bin/gjs -m "$here/main.js" "$@"
